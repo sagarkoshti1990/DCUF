@@ -10,13 +10,8 @@ import { RootStackParamList, MainTabParamList } from '../types';
 // Import screens
 import LoginScreen from '../screens/LoginScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-
-// Temporary simple components to test
-const DataEntryScreen: React.FC = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Data Entry Screen</Text>
-  </View>
-);
+import DataEntryScreen from '../screens/DataEntryScreen';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const ProgressScreen: React.FC = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -24,16 +19,36 @@ const ProgressScreen: React.FC = () => (
   </View>
 );
 
+const getTabBarIcon = (
+  routeName: string,
+  focused: boolean,
+  color: string,
+  size: number,
+) => {
+  let iconName: string = 'help-outline'; // Default fallback icon
+
+  if (routeName === 'DataEntry') {
+    iconName = focused ? 'home' : 'home-outline';
+  } else if (routeName === 'Settings') {
+    iconName = focused ? 'settings' : 'settings-outline';
+  } else if (routeName === 'Progress') {
+    iconName = focused ? 'analytics' : 'analytics-outline';
+  }
+
+  return <Ionicons name={iconName} size={size} color={color} />;
+};
+
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabs: React.FC = () => (
   <Tab.Navigator
-    screenOptions={{
-      tabBarActiveTintColor: '#6200ea',
+    screenOptions={({ route }) => ({
+      tabBarIcon: ({ focused, color, size }) =>
+        getTabBarIcon(route.name, focused, color, size),
+      tabBarActiveTintColor: 'tomato',
       tabBarInactiveTintColor: 'gray',
-      headerShown: false,
-    }}
+    })}
   >
     <Tab.Screen
       name="DataEntry"
