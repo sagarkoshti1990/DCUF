@@ -30,21 +30,16 @@ export class WordsApiService {
         requestBody,
       );
 
-      if (
-        response.success &&
-        response.data?.responseCode === 200 &&
-        response.data?.data?.words
-      ) {
-        // Transform the new API response structure to match our expected format
+      if (response.success && response.data?.data?.words) {
+        // Transform the API response structure to match our expected format
+        const apiData = response.data.data;
         const transformedData: PaginatedResponse<ApiWord> = {
-          items: response.data.data.words,
-          totalItems:
-            response.data.data.pagination?.total ||
-            response.data.data.words.length,
-          currentPage: response.data.data.pagination?.page || 1,
-          totalPages: response.data.data.pagination?.totalPages || 1,
-          hasNextPage: response.data.data.pagination?.hasNext || false,
-          hasPrevPage: response.data.data.pagination?.hasPrevious || false,
+          items: apiData.words,
+          totalItems: apiData.pagination?.total || apiData.words.length,
+          currentPage: apiData.pagination?.page || 1,
+          totalPages: apiData.pagination?.totalPages || 1,
+          hasNextPage: apiData.pagination?.hasNext || false,
+          hasPrevPage: apiData.pagination?.hasPrevious || false,
         };
 
         console.log('✅ Words fetched successfully:', transformedData);
@@ -163,7 +158,7 @@ export class WordsApiService {
     languageId: string,
   ): Promise<ApiResponse<ApiWord[]>> {
     try {
-      const response = await this.getWordsByLanguage([languageId], 1, 1000); // Large limit to get all
+      const response = await this.getWordsByLanguage([languageId], 1, 100); // Large limit to get all
 
       if (response.success && response.data) {
         return {
@@ -249,16 +244,15 @@ export class LanguagesApiService {
       );
 
       if (response.success && response.data?.data?.languages) {
-        // Transform the actual API response structure to match our expected format
+        // Transform the API response structure to match our expected format
+        const apiData = response.data.data;
         const transformedData: PaginatedResponse<ApiLanguage> = {
-          items: response.data.data.languages,
-          totalItems:
-            response.data.data.pagination?.total ||
-            response.data.data.languages.length,
-          currentPage: response.data.data.pagination?.page || 1,
-          totalPages: response.data.data.pagination?.totalPages || 1,
-          hasNextPage: response.data.data.pagination?.hasNext || false,
-          hasPrevPage: response.data.data.pagination?.hasPrevious || false,
+          items: apiData.languages,
+          totalItems: apiData.pagination?.total || apiData.languages.length,
+          currentPage: apiData.pagination?.page || 1,
+          totalPages: apiData.pagination?.totalPages || 1,
+          hasNextPage: apiData.pagination?.hasNext || false,
+          hasPrevPage: apiData.pagination?.hasPrevious || false,
         };
 
         console.log('✅ Languages fetched successfully:', transformedData);

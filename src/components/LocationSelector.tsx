@@ -15,7 +15,6 @@ import {
   Surface,
 } from 'react-native-paper';
 import { District, Tehsil, Village } from '../types';
-import { ApiDistrict, ApiTehsil, ApiVillage } from '../types/api';
 import { apiService } from '../services/apiService';
 import {
   mockDistricts,
@@ -33,41 +32,12 @@ interface LocationSelectorProps {
   useApi?: boolean; // Flag to switch between API and mock data
 }
 
-// Helper functions to convert between API and legacy types
-// We preserve the original API ID as a string in a custom property
-const convertApiDistrictToLegacy = (
-  apiDistrict: ApiDistrict,
-): District & { apiId?: string } => ({
-  id: parseInt(apiDistrict.id, 10) || 0,
-  name: apiDistrict.name,
-  state: apiDistrict.state || 'Maharashtra',
-  apiId: apiDistrict.id, // Preserve original UUID
-});
-
-const convertApiTehsilToLegacy = (
-  apiTehsil: ApiTehsil,
-): Tehsil & { apiId?: string } => ({
-  id: parseInt(apiTehsil.id, 10) || 0,
-  name: apiTehsil.name,
-  districtId: parseInt(apiTehsil.districtId, 10) || 0,
-  apiId: apiTehsil.id, // Preserve original UUID
-});
-
-const convertApiVillageToLegacy = (
-  apiVillage: ApiVillage,
-): Village & { apiId?: string } => ({
-  id: parseInt(apiVillage.id, 10) || 0,
-  name: apiVillage.name,
-  tehsilId: parseInt(apiVillage.tehsilId, 10) || 0,
-  apiId: apiVillage.id, // Preserve original UUID
-});
-
 // Custom Modal Picker Component
 interface ModalPickerProps {
   visible: boolean;
   title: string;
-  items: Array<{ id: number; name: string }>;
-  selectedItem: { id: number; name: string } | null;
+  items: Array<{ id: string; name: string }>;
+  selectedItem: { id: string; name: string } | null;
   onSelect: (item: any) => void;
   onDismiss: () => void;
   loading?: boolean;
@@ -101,13 +71,13 @@ const ModalPicker: React.FC<ModalPickerProps> = ({
               <ActivityIndicator size="large" />
               <Text style={styles.loadingText}>Loading...</Text>
             </View>
-          ) : items.length === 0 ? (
+          ) : items?.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>{emptyMessage}</Text>
             </View>
           ) : (
             <ScrollView style={styles.modalScroll}>
-              {items.map(item => (
+              {items?.map(item => (
                 <TouchableOpacity
                   key={item.id}
                   style={[
@@ -181,7 +151,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     try {
       const response = await apiService.locations.getAllDistricts();
       if (response.success && response.data) {
-        const legacyDistricts = response.data.map(convertApiDistrictToLegacy);
+        const legacyDistricts = response.data;
         setAvailableDistricts(legacyDistricts);
       } else {
         console.warn(
@@ -199,7 +169,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   // Load tehsils for selected district
   const loadTehsils = useCallback(
-    async (districtId: number) => {
+    async (districtId: string) => {
+      console.log('🛑 Loading tehsils for district: sagar', districtId);
       if (!useApi) {
         const filteredTehsils = mockTehsils.filter(
           tehsil => tehsil.districtId === districtId,
@@ -211,12 +182,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       setLoadingTehsils(true);
       try {
         const response = await apiService.locations.getTehsilsByDistrict(
-          districtId.toString(),
+          districtId,
         );
         if (response.success && response.data) {
-          const legacyTehsils = response.data.items.map(
-            convertApiTehsilToLegacy,
-          );
+          const legacyTehsils = response.data?.data.tehsils;
           setAvailableTehsils(legacyTehsils);
         } else {
           console.warn(
@@ -242,7 +211,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   // Load villages for selected tehsil
   const loadVillages = useCallback(
-    async (tehsilId: number) => {
+    async (tehsilId: string) => {
       if (!useApi) {
         const filteredVillages = mockVillages.filter(
           village => village.tehsilId === tehsilId,
@@ -254,12 +223,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       setLoadingVillages(true);
       try {
         const response = await apiService.locations.getVillagesByTehsil(
-          tehsilId.toString(),
+          tehsilId,
         );
         if (response.success && response.data) {
-          const legacyVillages = response.data.items.map(
-            convertApiVillageToLegacy,
-          );
+          const legacyVillages = response.data.data.villages;
           setAvailableVillages(legacyVillages);
         } else {
           console.warn(
@@ -290,7 +257,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       setDistrictMenuVisible(false);
       setTehsilMenuVisible(false);
       setVillageMenuVisible(false);
-      loadTehsils(district.id);
+      loadTehsils(district.districtId);
       onTehsilChange(null);
       onVillageChange(null);
     },
@@ -303,7 +270,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       onTehsilChange(tehsil);
       setTehsilMenuVisible(false);
       setVillageMenuVisible(false);
-      loadVillages(tehsil.id);
+      loadVillages(tehsil.tehsilId);
       onVillageChange(null);
     },
     [onTehsilChange, loadVillages, onVillageChange],
@@ -326,7 +293,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   // Update available tehsils when district changes
   useEffect(() => {
     if (selectedDistrict) {
-      loadTehsils(selectedDistrict.id);
+      loadTehsils(selectedDistrict.districtId);
     } else {
       setAvailableTehsils([]);
     }
@@ -338,7 +305,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   // Update available villages when tehsil changes
   useEffect(() => {
     if (selectedTehsil) {
-      loadVillages(selectedTehsil.id);
+      loadVillages(selectedTehsil.tehsilId);
     } else {
       setAvailableVillages([]);
     }
@@ -414,10 +381,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       <ModalPicker
         visible={districtMenuVisible}
         title="Select District"
-        items={availableDistricts.map(d => ({ id: d.id, name: d.name }))}
+        items={availableDistricts.map(d => ({
+          id: d.districtId,
+          name: d.name,
+        }))}
         selectedItem={
           selectedDistrict
-            ? { id: selectedDistrict.id, name: selectedDistrict.name }
+            ? { id: selectedDistrict.districtId, name: selectedDistrict.name }
             : null
         }
         onSelect={handleDistrictSelect}
@@ -429,10 +399,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       <ModalPicker
         visible={tehsilMenuVisible}
         title="Select Tehsil"
-        items={availableTehsils.map(t => ({ id: t.id, name: t.name }))}
+        items={availableTehsils?.map(t => ({ id: t.tehsilId, name: t.name }))}
         selectedItem={
           selectedTehsil
-            ? { id: selectedTehsil.id, name: selectedTehsil.name }
+            ? { id: selectedTehsil.tehsilId, name: selectedTehsil.name }
             : null
         }
         onSelect={handleTehsilSelect}
@@ -444,10 +414,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       <ModalPicker
         visible={villageMenuVisible}
         title="Select Village"
-        items={availableVillages.map(v => ({ id: v.id, name: v.name }))}
+        items={availableVillages.map(v => ({ id: v.villageId, name: v.name }))}
         selectedItem={
           selectedVillage
-            ? { id: selectedVillage.id, name: selectedVillage.name }
+            ? { id: selectedVillage.villageId, name: selectedVillage.name }
             : null
         }
         onSelect={handleVillageSelect}

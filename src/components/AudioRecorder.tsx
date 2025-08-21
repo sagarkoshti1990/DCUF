@@ -14,12 +14,23 @@ import {
   ProgressBar,
 } from 'react-native-paper';
 
+// 1. Import the library
+import AudioRecorderPlayer, {
+  AVEncoderAudioQualityIOSType,
+  AudioEncoderAndroidType,
+  AudioSourceAndroidType,
+  OutputFormatAndroidType,
+} from 'react-native-audio-recorder-player';
+
 interface AudioRecorderProps {
-  onRecordingComplete: (filePath: string, audioFile?: any) => void; // Use any for React Native file format
+  onRecordingComplete: (filePath: string, audioFile?: any) => void;
   isRecording: boolean;
   disabled?: boolean;
   existingRecording?: string;
 }
+
+// Correct way to use the library
+const audioRecorderPlayer = AudioRecorderPlayer;
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onRecordingComplete,
@@ -36,14 +47,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   >(existingRecording || null);
   const [internalIsRecording, setInternalIsRecording] = useState(false);
 
-  // Recording state management
-  const [recordingInterval, setRecordingInterval] = useState<number | null>(
-    null,
-  );
-  const [playbackInterval, setPlaybackInterval] = useState<number | null>(null);
-
   useEffect(() => {
     checkPermissions();
+    // 3. Add a cleanup function to stop recording/playback when component unmounts
+    return () => {
+      audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.stopPlayer();
+      audioRecorderPlayer.removePlayBackListener();
+      audioRecorderPlayer.removeRecordBackListener();
+    };
   }, []);
 
   const checkPermissions = async () => {
@@ -65,18 +77,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         setHasPermission(false);
       }
     } else {
-      setHasPermission(true); // iOS permissions handled in Info.plist
+      setHasPermission(true);
     }
   };
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs
       .toString()
       .padStart(2, '0')}`;
   };
 
+  // 4. Update to use the library's recording methods
   const onStartRecord = async () => {
     if (!hasPermission) {
       Alert.alert(
@@ -88,19 +101,34 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
 
     try {
+      const path = Platform.select({
+        ios: 'hello.m4a', // Use a consistent filename
+        android: `${PermissionsAndroid.PERMISSIONS.RECORD_AUDIO.split(
+          '.',
+        ).pop()}_${Date.now()}.m4a`, // Dynamic filename
+      });
+
+      const audioSet = {
+        AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+        AudioSourceAndroid: AudioSourceAndroidType.MIC,
+        AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+        AVLinearPCMBitRateKey: 16,
+        AVNumberOfChannelsKey: 2,
+        AVSampleRateKey: 44100,
+        OutputFormatAndroid: OutputFormatAndroidType.MPEG_4,
+      };
+
+      const uri = await audioRecorderPlayer.startRecorder(path, audioSet);
+      audioRecorderPlayer.addRecordBackListener(e => {
+        const currentTime = audioRecorderPlayer.mmss(
+          Math.floor(e.currentPosition),
+        );
+        setRecordTime(currentTime);
+      });
+
       setInternalIsRecording(true);
-      setRecordTime('00:00');
-
-      // Start timer for recording duration
-      let recordingTime = 0;
-      const interval = setInterval(() => {
-        recordingTime += 1;
-        setRecordTime(formatTime(recordingTime));
-      }, 1000);
-      setRecordingInterval(interval);
-
-      // For now, simulate recording since the native library has issues
-      console.log('🎤 Recording started');
+      setCurrentRecordingPath(uri);
+      console.log('🎤 Recording started. URI:', uri);
     } catch (error) {
       console.error('Start recording error:', error);
       setInternalIsRecording(false);
@@ -113,38 +141,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   const onStopRecord = async () => {
     try {
+      const result = await audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.removeRecordBackListener();
+
       setInternalIsRecording(false);
 
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        setRecordingInterval(null);
-      }
+      // The library gives us the path and the file object is created internally.
+      // We can use the result directly in the parent component.
+      onRecordingComplete(result);
 
-      // Generate a proper audio file with correct extension and MIME type
-      const timestamp = Date.now();
-      const fileName = `recording_${timestamp}.m4a`; // Use .m4a for better compatibility
-
-      // Create a React Native compatible file object for FormData
-      // This will be handled properly by the httpClient for FormData submission
-      const audioFileData = {
-        uri: `file://mock_audio_${timestamp}.m4a`, // Mock local file URI
-        type: 'audio/m4a',
-        name: fileName,
-      };
-
-      setCurrentRecordingPath(fileName);
-      onRecordingComplete(fileName, audioFileData);
-
-      console.log('🛑 Recording stopped:', fileName);
-      console.log('📁 Audio file created:', {
-        name: audioFileData.name,
-        type: audioFileData.type,
-        uri: audioFileData.uri,
-      });
-
+      console.log('🛑 Recording stopped:', result);
       Alert.alert(
         'Recording Complete',
-        `Audio recorded successfully!\nDuration: ${recordTime}\nFormat: M4A`,
+        `Audio recorded successfully!\nFile Path: ${result}`,
         [{ text: 'OK' }],
       );
     } catch (error) {
@@ -154,6 +163,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   };
 
+  // 5. Update to use the library's playback methods
   const onStartPlay = async () => {
     if (!currentRecordingPath) {
       Alert.alert('No Recording', 'Please record audio first');
@@ -164,22 +174,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setIsPlaying(true);
       setPlayTime('00:00');
 
-      // Simulate playback with timer
-      let playbackTime = 0;
-      const maxPlayTime = 30; // Assume max 30 seconds for demo
-
-      const interval = setInterval(() => {
-        playbackTime += 1;
-        setPlayTime(formatTime(playbackTime));
-
-        if (playbackTime >= maxPlayTime) {
+      await audioRecorderPlayer.startPlayer(currentRecordingPath);
+      audioRecorderPlayer.addPlayBackListener(e => {
+        if (e.currentPosition === e.duration) {
+          audioRecorderPlayer.stopPlayer();
           setIsPlaying(false);
           setPlayTime('00:00');
-          clearInterval(interval);
+          audioRecorderPlayer.removePlayBackListener();
+        } else {
+          setPlayTime(audioRecorderPlayer.mmss(Math.floor(e.currentPosition)));
         }
-      }, 1000);
-      setPlaybackInterval(interval);
-
+      });
       console.log('▶️ Playback started');
     } catch (error) {
       console.error('Play error:', error);
@@ -190,14 +195,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   const onStopPlay = async () => {
     try {
+      await audioRecorderPlayer.stopPlayer();
+      audioRecorderPlayer.removePlayBackListener();
       setIsPlaying(false);
       setPlayTime('00:00');
-
-      if (playbackInterval) {
-        clearInterval(playbackInterval);
-        setPlaybackInterval(null);
-      }
-
       console.log('⏹️ Playback stopped');
     } catch (error) {
       console.error('Stop play error:', error);
@@ -214,10 +215,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            // No need to delete the file, the library handles that.
+            // Just clear the state.
             setCurrentRecordingPath(null);
             setRecordTime('00:00');
             setPlayTime('00:00');
-            onRecordingComplete(''); // Clear the recording
+            onRecordingComplete('');
             console.log('🗑️ Recording deleted');
           },
         },
@@ -246,7 +249,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
             disabled={disabled || !hasPermission}
             style={[
               styles.recordButton,
-              currentlyRecording && styles.recordingButton,
+              currentlyRecording ? styles.recordingButton : [],
               disabled && styles.disabledButton,
             ]}
           />
@@ -336,9 +339,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   );
 };
 
+// ... (styles remain the same)
 const styles = StyleSheet.create({
   card: {
-    margin: 16,
+    marginVertical: 16,
     elevation: 2,
   },
   title: {
@@ -360,7 +364,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   recordingButton: {
-    transform: [{ scale: 1.1 }],
+    transform: [],
   },
   disabledButton: {
     opacity: 0.5,
@@ -439,5 +443,4 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
-
 export default AudioRecorder;

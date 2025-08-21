@@ -122,7 +122,7 @@ const RegionalWordInput: React.FC<RegionalWordInputProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    margin: 16,
+    marginVertical: 16,
     elevation: 2,
   },
   title: {

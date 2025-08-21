@@ -1,19 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
   Alert,
 } from 'react-native';
 import {
   Card,
   Text,
-  List,
   ActivityIndicator,
   Chip,
   Searchbar,
   FAB,
+  Badge,
+  IconButton,
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -37,6 +39,10 @@ const SubmissionsScreen: React.FC = () => {
   const [page, setPage] = useState(1);
   const [hasMoreData, setHasMoreData] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Add ref to prevent rapid requests
+  const lastLoadTimeRef = useRef<number>(0);
 
   // Extract stable values to prevent re-render loops
   const userId = state.user?.id;
@@ -47,13 +53,34 @@ const SubmissionsScreen: React.FC = () => {
 
   // Load submissions based on current user and filters
   const loadSubmissions = useCallback(
-    async (pageNum: number = 1, isRefresh: boolean = false) => {
+    async (
+      pageNum: number = 1,
+      isRefresh: boolean = false,
+      currentFilterStatus: string = 'all',
+    ) => {
       if (!userApiId || !apiInitialized) return;
+
+      // Debounce mechanism - prevent rapid requests
+      const now = Date.now();
+      if (!isRefresh && now - lastLoadTimeRef.current < 1000) {
+        console.log('🚫 Debouncing request - too soon');
+        return;
+      }
+      lastLoadTimeRef.current = now;
+
+      // Prevent multiple simultaneous requests
+      if (loading && !isRefresh) {
+        console.log('🚫 Skipping request - already loading');
+        return;
+      }
 
       if (isRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
+        if (pageNum > 1) {
+          setIsLoadingMore(true);
+        }
       }
 
       try {
@@ -69,9 +96,9 @@ const SubmissionsScreen: React.FC = () => {
         filters.userIds = [userApiId];
 
         // Add status filter if not 'all'
-        if (filterStatus !== 'all') {
+        if (currentFilterStatus !== 'all') {
           filters.statuses = [
-            filterStatus as 'pending' | 'approved' | 'rejected',
+            currentFilterStatus as 'pending' | 'approved' | 'rejected',
           ];
         }
 
@@ -82,6 +109,7 @@ const SubmissionsScreen: React.FC = () => {
         );
 
         if (response.success && response.data) {
+          console.log('🔍 Response:', response);
           const newSubmissions = response.data.items;
 
           if (isRefresh || pageNum === 1) {
@@ -95,7 +123,7 @@ const SubmissionsScreen: React.FC = () => {
           setPage(pageNum);
 
           console.log('✅ Loaded submissions:', {
-            count: newSubmissions.length,
+            count: newSubmissions?.length,
             total: response.data.totalItems,
             hasMore: response.data.hasNextPage,
           });
@@ -103,31 +131,41 @@ const SubmissionsScreen: React.FC = () => {
           console.error('❌ Failed to load submissions:', response.error);
         }
       } catch (error) {
-        console.error('Load submissions error:', error);
+        console.error(`Load submissions error:`, error);
       } finally {
         setLoading(false);
         setRefreshing(false);
+        setIsLoadingMore(false);
       }
     },
-    [userApiId, apiInitialized, filterStatus],
+    [userApiId, apiInitialized, loading], // Include loading in dependencies
   );
 
-  // Initial load
+  // Initial load - only run once when API is ready
   useEffect(() => {
     if (apiInitialized && userApiId) {
-      loadSubmissions(1, true);
+      loadSubmissions(1, true, filterStatus);
     }
-  }, [loadSubmissions, apiInitialized, userApiId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiInitialized, userApiId]);
+
+  // Handle filter status changes
+  useEffect(() => {
+    if (apiInitialized && userApiId) {
+      loadSubmissions(1, true, filterStatus);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus]);
 
   // Refresh handler
   const handleRefresh = () => {
-    loadSubmissions(1, true);
+    loadSubmissions(1, true, filterStatus);
   };
 
   // Load more handler
   const handleLoadMore = () => {
-    if (hasMoreData && !loading) {
-      loadSubmissions(page + 1);
+    if (hasMoreData && !loading && !isLoadingMore) {
+      loadSubmissions(page + 1, false, filterStatus);
     }
   };
 
@@ -138,59 +176,106 @@ const SubmissionsScreen: React.FC = () => {
     setFilterStatus(status);
     setPage(1);
     setSubmissions([]);
+    setHasMoreData(true);
+    // Filter change will trigger useEffect above
+  };
+
+  // Handle audio playback
+  const handleAudioPlay = (audioUrl: string, _submissionId: string) => {
+    Alert.alert('Audio Playback', 'Audio playback feature coming soon!', [
+      { text: 'OK', style: 'default' },
+      {
+        text: 'Open URL',
+        style: 'default',
+        onPress: () => {
+          console.log('Audio URL:', audioUrl);
+          // In a real app, you would use a library like react-native-sound or expo-av
+          // For now, just log the URL
+        },
+      },
+    ]);
   };
 
   // Render submission item
   const renderSubmissionItem = (submission: ApiSubmission) => {
-    const statusColor = {
-      pending: '#f39c12',
-      approved: '#27ae60',
-      rejected: '#e74c3c',
+    const statusConfig = {
+      pending: { color: '#f39c12', bgColor: '#fef9e7', icon: 'clock-outline' },
+      approved: { color: '#27ae60', bgColor: '#eafaf1', icon: 'check-circle' },
+      rejected: { color: '#e74c3c', bgColor: '#fdeaea', icon: 'close-circle' },
     }[submission.status];
+
+    const wordText =
+      submission.word?.word || submission.word?.english || 'Unknown Word';
 
     return (
       <Card key={submission.id} style={styles.submissionCard}>
-        <List.Item
-          title={submission.word?.english || 'Unknown Word'}
-          description={
-            <View style={styles.submissionDetails}>
-              <Text style={styles.synonyms}>
-                Synonyms: {submission.synonyms}
-              </Text>
-              <Text style={styles.location}>
-                {submission.village?.name}, {submission.tehsil?.name},{' '}
-                {submission.district?.name}
-              </Text>
-              <Text style={styles.date}>
-                Submitted: {new Date(submission.createdAt).toLocaleDateString()}
-              </Text>
-            </View>
-          }
-          left={() => (
-            <View style={styles.leftContent}>
-              <Chip
-                mode="outlined"
-                textStyle={{ color: statusColor }}
-                style={[styles.statusChip, { borderColor: statusColor }]}
-              >
-                {submission.status.toUpperCase()}
-              </Chip>
-            </View>
-          )}
-          right={() => (
-            <View style={styles.rightContent}>
-              {submission.audioUrl && (
-                <Chip
-                  icon="volume-high"
-                  mode="outlined"
-                  style={styles.audioChip}
-                >
-                  Audio
+        <Card.Content style={styles.cardContent}>
+          {/* Header with word and status */}
+          <View style={styles.cardHeader}>
+            <View style={styles.wordContainer}>
+              <Text style={styles.wordText}>{wordText}</Text>
+              {submission.language && (
+                <Chip mode="outlined" compact style={styles.languageChip}>
+                  {submission.language.name}
                 </Chip>
               )}
             </View>
+            <TouchableOpacity
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusConfig.bgColor },
+              ]}
+            >
+              <Badge
+                style={[
+                  styles.statusIndicator,
+                  { backgroundColor: statusConfig.color },
+                ]}
+              />
+              <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                {submission.status.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Synonyms */}
+          <View style={styles.synonymsContainer}>
+            <Text style={styles.synonymsLabel}>Synonyms:</Text>
+            <Text style={styles.synonymsText}>{submission.synonyms}</Text>
+          </View>
+
+          {/* Location and Date */}
+          <View style={styles.metadataContainer}>
+            <View style={styles.locationContainer}>
+              <Text style={styles.locationText}>
+                📍 {submission.village?.name}, {submission.tehsil?.name},{' '}
+                {submission.district?.name}
+              </Text>
+            </View>
+            <Text style={styles.dateText}>
+              {new Date(submission.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+
+          {/* Audio Section */}
+          {submission.audioUrl && (
+            <TouchableOpacity
+              style={styles.audioContainer}
+              onPress={() =>
+                handleAudioPlay(submission.audioUrl!, submission.id)
+              }
+            >
+              <IconButton
+                icon="play-circle"
+                size={24}
+                iconColor="#6366f1"
+                style={styles.audioIcon}
+              />
+              <Text style={styles.audioText}>Play Audio</Text>
+              <IconButton icon="volume-high" size={20} iconColor="#6366f1" />
+            </TouchableOpacity>
           )}
-        />
+        </Card.Content>
       </Card>
     );
   };
@@ -252,14 +337,26 @@ const SubmissionsScreen: React.FC = () => {
         }
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const paddingToBottom = 100; // Increase padding to trigger earlier but less frequently
           const isCloseToBottom =
             layoutMeasurement.height + contentOffset.y >=
-            contentSize.height - 20;
-          if (isCloseToBottom && hasMoreData && !loading) {
+            contentSize.height - paddingToBottom;
+
+          // More strict conditions to prevent rapid firing
+          if (
+            isCloseToBottom &&
+            hasMoreData &&
+            !loading &&
+            !refreshing &&
+            !isLoadingMore &&
+            submissions.length > 0 // Only trigger if we have existing data
+          ) {
+            console.log('🔄 Loading more submissions...');
             handleLoadMore();
           }
         }}
-        scrollEventThrottle={400}
+        scrollEventThrottle={200}
+        showsVerticalScrollIndicator={true}
       >
         {submissions && submissions.length === 0 && !loading ? (
           <Card style={styles.emptyCard}>
@@ -274,10 +371,26 @@ const SubmissionsScreen: React.FC = () => {
           submissions && submissions.map(renderSubmissionItem)
         )}
 
-        {loading && (
+        {loading && submissions.length === 0 && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" />
             <Text style={styles.loadingText}>Loading submissions...</Text>
+          </View>
+        )}
+
+        {loading && submissions.length > 0 && (
+          <View style={styles.paginationLoadingContainer}>
+            <ActivityIndicator size="small" />
+            <Text style={styles.paginationLoadingText}>Loading more...</Text>
+          </View>
+        )}
+
+        {isLoadingMore && (
+          <View style={styles.paginationLoadingContainer}>
+            <ActivityIndicator size="small" />
+            <Text style={styles.paginationLoadingText}>
+              Loading more submissions...
+            </Text>
           </View>
         )}
 
@@ -353,36 +466,97 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
   },
-  submissionDetails: {
-    marginTop: 4,
+  cardContent: {
+    padding: 12,
   },
-  synonyms: {
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  wordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  wordText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  languageChip: {
+    backgroundColor: '#e0e0e0',
+    borderColor: '#b0b0b0',
+    borderWidth: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  statusIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  synonymsContainer: {
+    marginBottom: 8,
+  },
+  synonymsLabel: {
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 2,
   },
-  location: {
-    fontSize: 12,
+  synonymsText: {
+    fontSize: 14,
     color: '#666',
-    marginBottom: 2,
   },
-  date: {
-    fontSize: 12,
+  metadataContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  dateText: {
+    fontSize: 14,
     color: '#999',
   },
-  leftContent: {
-    justifyContent: 'center',
+  audioContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f9eb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e1f3d8',
+  },
+  audioIcon: {
     marginRight: 8,
   },
-  rightContent: {
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  statusChip: {
-    marginBottom: 4,
-  },
-  audioChip: {
-    marginTop: 4,
+  audioText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4f46e5',
+    marginRight: 8,
   },
   emptyCard: {
     margin: 16,
@@ -407,6 +581,16 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
+    color: '#666',
+  },
+  paginationLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  paginationLoadingText: {
+    marginLeft: 8,
     color: '#666',
   },
   endContainer: {

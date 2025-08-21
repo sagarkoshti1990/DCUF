@@ -13,7 +13,7 @@ import { apiService } from './src/services/apiService';
 
 // Initialize API service when app starts
 await apiService.initialize({
-  baseUrl: 'https://59312d0a3250.ngrok-free.app', // From Postman environment
+  baseUrl: 'https://rlapi.tekdinext.com', // From Postman environment
 });
 ```
 
@@ -455,7 +455,7 @@ From the Postman collection:
 
 ### API Documentation
 
-- **Base URL**: `https://59312d0a3250.ngrok-free.app`
+- **Base URL**: `https://rlapi.tekdinext.com`
 - **Postman Collection**: Available with complete request examples
 - **Environment**: Configured with necessary variables
 

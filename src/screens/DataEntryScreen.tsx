@@ -341,19 +341,6 @@ const DataEntryScreen: React.FC = () => {
             </Text>
           )}
         </View>
-
-        {/* Language & Word Selection */}
-        <LanguageWordSelector
-          selectedLanguage={selectedLanguage}
-          selectedWord={selectedWord}
-          onLanguageSelect={handleLanguageChange}
-          onWordSelect={setSelectedWord}
-          disabled={false}
-          useApi={state.apiInitialized}
-        />
-
-        <Divider style={styles.divider} />
-
         {/* Location Selection */}
         <LocationSelector
           selectedDistrict={selectedDistrict}
@@ -362,6 +349,17 @@ const DataEntryScreen: React.FC = () => {
           onDistrictChange={setSelectedDistrict}
           onTehsilChange={setSelectedTehsil}
           onVillageChange={setSelectedVillage}
+          useApi={state.apiInitialized}
+        />
+
+        <Divider style={styles.divider} />
+        {/* Language & Word Selection */}
+        <LanguageWordSelector
+          selectedLanguage={selectedLanguage}
+          selectedWord={selectedWord}
+          onLanguageSelect={handleLanguageChange}
+          onWordSelect={setSelectedWord}
+          disabled={false}
           useApi={state.apiInitialized}
         />
 

@@ -1,15 +1,20 @@
 // Re-export all API types for convenience
 export * from './api';
 
-// Legacy User and Authentication Types (maintained for backward compatibility)
+// Updated User and Authentication Types to match API response structure
 export interface User {
-  id: string;
-  username: string;
+  userId: string; // Primary identifier from API (previously id)
+  username?: string; // Made optional as it might not always be present
   email: string;
-  fName: string;
-  lName: string;
+  fName: string; // First name
+  lName: string; // Last name
   role: 'WORKER' | 'ADMIN';
   status: 'active' | 'inactive';
+  createdAt?: string;
+  updatedAt?: string;
+  // Legacy compatibility field
+  id?: string; // For backward compatibility
+  loginTime?: string;
 }
 
 export interface AuthResponse {
@@ -22,44 +27,61 @@ export interface AuthResponse {
   error?: any;
 }
 
-// Legacy Location Types (maintained for backward compatibility)
+// Updated Location Types to match API response structure
 export interface District {
-  id: number;
+  districtId: string; // Changed from number to string to match API
   name: string;
-  state: string;
+  state?: string; // Made optional since it might not be in all API responses
+  status?: 'active' | 'inactive'; // Added status field
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Tehsil {
-  id: number;
+  tehsilId: string;
   name: string;
-  districtId: number;
+  districtId: string;
+  status: 'active' | 'inactive';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Village {
-  id: number;
+  villageId: string;
   name: string;
-  tehsilId: number;
+  tehsilId: string;
+  status: 'active' | 'inactive';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// Legacy Word and Submission Types (maintained for backward compatibility)
+// Updated Word Types to match API response structure
 export interface MasterWord {
-  id: number;
-  english: string;
-  marathi?: string;
-  hindi?: string;
-  category: string;
-  apiId?: string; // API UUID for new API integration
+  wordId: string; // Primary identifier from API
+  languageId: string;
+  word: string; // The actual word text (in any language)
+  categoryId: string | null; // Can be null as per API response
+  status: 'active' | 'inactive';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
+// Updated Submission Types to match API response structure
 export interface Submission {
-  id: string;
-  masterWordId: number;
-  regionalWord: string;
-  audioFilePath: string;
-  locationId: number;
-  workerId: number;
-  timestamp: string;
-  synced: boolean;
+  submissionId: string; // Primary identifier from API (previously id)
+  userId: string; // User who made the submission
+  wordId: string; // Reference to the word
+  synonyms: string; // The submitted synonym/regional word
+  audioUrl: string | null; // URL to audio file (can be null)
+  villageId: string;
+  tehsilId: string;
+  districtId: string;
+  languageId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 // App State Types

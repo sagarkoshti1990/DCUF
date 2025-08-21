@@ -19,7 +19,7 @@ The API integration plan has been successfully executed, transforming the Region
 - ✅ **API Constants (`src/constants/apiConstants.ts`)**
 
   - Centralized API configuration
-  - Base URL from Postman environment: `https://59312d0a3250.ngrok-free.app`
+  - Base URL from Postman environment: `https://rlapi.tekdinext.com`
   - All endpoints mapped from Postman collection
   - HTTP methods and status codes defined
 
@@ -313,7 +313,7 @@ All endpoints from the Postman collection have been integrated:
 2. **Verify Credentials**
 
    - Test login with: `tushar.mahajan@tekditechnologies.com` / `Password@123!`
-   - Verify API connectivity to `https://59312d0a3250.ngrok-free.app`
+   - Verify API connectivity to `https://rlapi.tekdinext.com`
 
 3. **Configure Environment**
    - Update API base URL if needed in `src/constants/apiConstants.ts`

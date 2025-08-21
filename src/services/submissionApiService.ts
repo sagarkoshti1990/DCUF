@@ -221,18 +221,41 @@ export class SubmissionApiService {
         ...filters,
       };
 
-      const response = await httpClient.post<PaginatedResponse<ApiSubmission>>(
+      const response = await httpClient.post<any>(
         API_ENDPOINTS.SUBMISSIONS.FILTER,
         requestBody,
       );
 
-      if (response.success) {
-        console.log('✅ Submissions fetched successfully:', response.data);
-      } else {
-        console.error('❌ Failed to fetch submissions:', response.error);
-      }
+      if (response.success && response.data?.data?.submissions) {
+        // Transform the API response structure to match our expected format
+        const apiData = response.data.data;
+        const transformedData: PaginatedResponse<ApiSubmission> = {
+          items: apiData.submissions.map((submission: any) => ({
+            ...submission,
+            id: submission.submissionId, // Map submissionId to id
+          })),
+          totalItems: apiData.pagination?.total || apiData.submissions.length,
+          currentPage: apiData.pagination?.page || 1,
+          totalPages: apiData.pagination?.totalPages || 1,
+          hasNextPage: apiData.pagination?.hasNext || false,
+          hasPrevPage: apiData.pagination?.hasPrevious || false,
+        };
 
-      return response;
+        console.log('✅ Submissions fetched successfully:', transformedData);
+        return {
+          success: true,
+          data: transformedData,
+        };
+      } else {
+        console.error(
+          '❌ Failed to fetch submissions:',
+          response.error || 'Invalid response structure',
+        );
+        return {
+          success: false,
+          error: response.error || 'Invalid response structure',
+        };
+      }
     } catch (error: any) {
       console.error('Get submissions with filters error:', error);
       return {

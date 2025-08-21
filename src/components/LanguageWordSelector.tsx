@@ -7,13 +7,11 @@ import {
   ActivityIndicator,
   useTheme,
   Searchbar,
-  Chip,
 } from 'react-native-paper';
 import { ApiLanguage } from '../types/api';
 import { MasterWord } from '../types';
 import { ApiWord } from '../types/api';
 import { apiService } from '../services/apiService';
-import { mockWords } from '../data/mockWords';
 
 interface LanguageWordSelectorProps {
   selectedLanguage: ApiLanguage | null;
@@ -23,16 +21,6 @@ interface LanguageWordSelectorProps {
   disabled?: boolean;
   useApi?: boolean;
 }
-
-// Helper function to convert API word to legacy format
-const convertApiWordToLegacy = (apiWord: ApiWord): MasterWord => ({
-  id: parseInt(apiWord.id, 10) || 0,
-  english: apiWord.english,
-  marathi: apiWord.marathi || '',
-  hindi: apiWord.hindi || '',
-  category: apiWord.category || 'General',
-  apiId: apiWord.id,
-});
 
 const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
   selectedLanguage,
@@ -45,9 +33,7 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
   const theme = useTheme();
   const [languages, setLanguages] = useState<ApiLanguage[]>([]);
   const [words, setWords] = useState<MasterWord[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // UI state
   const [isLanguageExpanded, setIsLanguageExpanded] = useState(false);
@@ -86,14 +72,15 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
   // Load words based on selected language
   const loadWords = useCallback(async () => {
     if (!useApi) {
-      setWords(mockWords);
+      console.log('📝 API disabled, clearing words');
+      setWords([]);
       return;
     }
 
     const isAuthenticated = await apiService.auth.isAuthenticated();
     if (!isAuthenticated) {
-      console.log('🔒 User not authenticated, using mock words');
-      setWords(mockWords);
+      console.log('🔒 User not authenticated, clearing words');
+      setWords([]);
       return;
     }
 
@@ -109,38 +96,49 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
         selectedLanguage.languageId,
       );
       if (response.success && response.data) {
-        const legacyWords = response.data.map(convertApiWordToLegacy);
-        setWords(legacyWords);
+        // Ensure the API response matches MasterWord structure
+        const wordsData: MasterWord[] = response.data.map(
+          (apiWord: ApiWord) => ({
+            wordId: apiWord.wordId,
+            languageId: apiWord.languageId,
+            word: apiWord.word,
+            categoryId: apiWord.categoryId || 'N/A',
+            status: apiWord.status,
+          }),
+        );
+        setWords(wordsData);
         console.log(
-          `✅ Loaded ${legacyWords.length} words for language ${selectedLanguage.languageId}`,
+          `✅ Loaded ${wordsData.length} words for language ${selectedLanguage.languageId}`,
         );
       } else {
-        console.warn(
-          'Failed to load words from API, falling back to mock data:',
-          response.error,
-        );
-        setWords(mockWords);
+        console.warn('Failed to load words from API:', response.error);
+        setWords([]);
       }
     } catch (error) {
       console.error('Error loading words:', error);
-      setWords(mockWords);
+      setWords([]);
     } finally {
       setLoadingWords(false);
     }
   }, [useApi, selectedLanguage]);
 
-  // Load categories based on current words
-  const loadCategories = useCallback(() => {
-    if (!words || words.length === 0) {
-      setCategories([]);
-      return;
+  // Filter words based on search query only (removed category filter)
+  const filteredWords = useMemo(() => {
+    if (!words || !Array.isArray(words)) {
+      return [];
     }
 
-    const uniqueCategories = Array.from(
-      new Set(words.map(word => word.category)),
-    );
-    setCategories(uniqueCategories.sort());
-  }, [words]);
+    let filtered = words;
+
+    // Filter by search query only
+    if (searchQuery) {
+      filtered = filtered.filter(word =>
+        word.word.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+    }
+
+    return filtered;
+  }, [words, searchQuery]);
 
   // Load data effects
   useEffect(() => {
@@ -153,47 +151,14 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
     loadWords();
   }, [loadWords]);
 
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
-
-  // Filter words based on search query and category
-  const filteredWords = useMemo(() => {
-    if (!words || !Array.isArray(words)) {
-      return [];
-    }
-
-    let filtered = words;
-
-    // Filter by category
-    if (selectedCategory) {
-      filtered = filtered.filter(word => word.category === selectedCategory);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter(
-        word =>
-          word.english.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (word.marathi &&
-            word.marathi.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (word.hindi &&
-            word.hindi.toLowerCase().includes(searchQuery.toLowerCase())),
-      );
-    }
-
-    return filtered;
-  }, [words, searchQuery, selectedCategory]);
-
   // Handlers
   const handleLanguageSelect = (language: ApiLanguage) => {
     onLanguageSelect(language);
     setIsLanguageExpanded(false);
     // Clear word selection when language changes
     if (selectedWord) {
-      // Reset search and filters when language changes
+      // Reset search when language changes
       setSearchQuery('');
-      setSelectedCategory(null);
     }
   };
 
@@ -201,15 +166,6 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
     onWordSelect(word);
     setIsWordExpanded(false);
     setSearchQuery('');
-  };
-
-  const handleCategorySelect = (category: string) => {
-    setSelectedCategory(selectedCategory === category ? null : category);
-  };
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedCategory(null);
   };
 
   // Render functions
@@ -224,16 +180,10 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
 
   const renderWordItem = ({ item }: { item: MasterWord }) => (
     <List.Item
-      title={item.english}
+      title={item.word}
       description={
         <View>
-          {item.marathi && (
-            <Text style={styles.translation}>मराठी: {item.marathi}</Text>
-          )}
-          {item.hindi && (
-            <Text style={styles.translation}>हिंदी: {item.hindi}</Text>
-          )}
-          <Text style={styles.category}>Category: {item.category}</Text>
+          <Text style={styles.status}>Status: {item.status}</Text>
         </View>
       }
       onPress={() => handleWordSelect(item)}
@@ -293,39 +243,10 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
     searchBar: {
       marginBottom: 16,
     },
-    categoryContainer: {
-      marginBottom: 16,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '500',
-      marginBottom: 8,
-      color: theme.colors.onSurface,
-    },
-    chipContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    chip: {
-      marginRight: 8,
-      marginBottom: 8,
-    },
-    clearFilters: {
-      color: theme.colors.primary,
-      textAlign: 'center',
-      marginTop: 8,
-      textDecorationLine: 'underline',
-    },
-    translation: {
-      fontSize: 12,
+    status: {
+      fontSize: 10,
       color: theme.colors.onSurfaceVariant,
       marginTop: 2,
-    },
-    category: {
-      fontSize: 10,
-      color: theme.colors.outline,
-      marginTop: 4,
       fontStyle: 'italic',
     },
     disabled: {
@@ -420,10 +341,8 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
             {selectedWord && (
               <View style={[styles.selectedContainer, { marginTop: 16 }]}>
                 <List.Item
-                  title={`Word: ${selectedWord.english}`}
-                  description={`${selectedWord.marathi || ''} ${
-                    selectedWord.hindi || ''
-                  }`.trim()}
+                  title={`Word: ${selectedWord.word}`}
+                  description={`Status: ${selectedWord.status}`}
                   left={props => (
                     <List.Icon {...props} icon="book-open-variant" />
                   )}
@@ -479,39 +398,12 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
                       style={styles.searchBar}
                     />
 
-                    {/* Category Filter */}
-                    {categories.length > 0 && (
-                      <View style={styles.categoryContainer}>
-                        <Text style={styles.label}>Filter by Category</Text>
-                        <View style={styles.chipContainer}>
-                          {categories.map(category => (
-                            <Chip
-                              key={category}
-                              selected={selectedCategory === category}
-                              onPress={() => handleCategorySelect(category)}
-                              style={styles.chip}
-                            >
-                              {category}
-                            </Chip>
-                          ))}
-                        </View>
-                        {(searchQuery || selectedCategory) && (
-                          <Text
-                            style={styles.clearFilters}
-                            onPress={clearFilters}
-                          >
-                            Clear Filters
-                          </Text>
-                        )}
-                      </View>
-                    )}
-
                     {/* Words List */}
                     <View style={styles.listContainer}>
                       <FlatList
                         data={filteredWords}
                         renderItem={renderWordItem}
-                        keyExtractor={item => item.id.toString()}
+                        keyExtractor={item => item.wordId.toString()}
                         showsVerticalScrollIndicator={true}
                         ListEmptyComponent={
                           <View style={styles.emptyContainer}>

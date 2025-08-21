@@ -6,7 +6,7 @@ import {
   ApiTehsil,
   ApiVillage,
   LocationFilterRequest,
-  PaginatedResponse,
+  AllResponse,
 } from '../types/api';
 
 export class LocationApiService {
@@ -15,7 +15,7 @@ export class LocationApiService {
    */
   async getDistricts(
     filters?: LocationFilterRequest,
-  ): Promise<ApiResponse<PaginatedResponse<ApiDistrict>>> {
+  ): Promise<ApiResponse<AllResponse<ApiDistrict>>> {
     try {
       const requestBody = {
         page: filters?.page || 1,
@@ -25,7 +25,7 @@ export class LocationApiService {
         ...filters,
       };
 
-      const response = await httpClient.post<PaginatedResponse<ApiDistrict>>(
+      const response = await httpClient.post<AllResponse<ApiDistrict>>(
         API_ENDPOINTS.LOCATIONS.DISTRICTS,
         requestBody,
       );
@@ -51,7 +51,7 @@ export class LocationApiService {
    */
   async getTehsils(
     filters?: LocationFilterRequest,
-  ): Promise<ApiResponse<PaginatedResponse<ApiTehsil>>> {
+  ): Promise<ApiResponse<AllResponse<ApiTehsil>>> {
     try {
       const requestBody = {
         page: filters?.page || 1,
@@ -61,7 +61,7 @@ export class LocationApiService {
         ...filters,
       };
 
-      const response = await httpClient.post<PaginatedResponse<ApiTehsil>>(
+      const response = await httpClient.post<AllResponse<ApiTehsil>>(
         API_ENDPOINTS.LOCATIONS.TEHSILS,
         requestBody,
       );
@@ -70,6 +70,10 @@ export class LocationApiService {
         console.log('✅ Tehsils fetched successfully:', response.data);
       } else {
         console.error('❌ Failed to fetch tehsils:', response.error);
+        return {
+          success: false,
+          error: response.error || 'Failed to fetch tehsils',
+        };
       }
 
       return response;
@@ -87,7 +91,7 @@ export class LocationApiService {
    */
   async getVillages(
     filters?: LocationFilterRequest,
-  ): Promise<ApiResponse<PaginatedResponse<ApiVillage>>> {
+  ): Promise<ApiResponse<AllResponse<ApiVillage>>> {
     try {
       const requestBody = {
         page: filters?.page || 1,
@@ -97,7 +101,7 @@ export class LocationApiService {
         ...filters,
       };
 
-      const response = await httpClient.post<PaginatedResponse<ApiVillage>>(
+      const response = await httpClient.post<AllResponse<ApiVillage>>(
         API_ENDPOINTS.LOCATIONS.VILLAGES,
         requestBody,
       );
@@ -108,7 +112,10 @@ export class LocationApiService {
         console.error('❌ Failed to fetch villages:', response.error);
       }
 
-      return response;
+      return {
+        success: true,
+        data: response.data,
+      };
     } catch (error: any) {
       console.error('Get villages error:', error);
       return {
@@ -123,7 +130,7 @@ export class LocationApiService {
    */
   async getTehsilsByDistrict(
     districtId: string,
-  ): Promise<ApiResponse<PaginatedResponse<ApiTehsil>>> {
+  ): Promise<ApiResponse<AllResponse<ApiTehsil>>> {
     try {
       const filters: LocationFilterRequest = {
         districtId,
@@ -148,7 +155,7 @@ export class LocationApiService {
    */
   async getVillagesByTehsil(
     tehsilId: string,
-  ): Promise<ApiResponse<PaginatedResponse<ApiVillage>>> {
+  ): Promise<ApiResponse<AllResponse<ApiVillage>>> {
     try {
       const filters: LocationFilterRequest = {
         tehsilId,
@@ -173,7 +180,7 @@ export class LocationApiService {
    */
   async searchDistricts(
     searchTerm: string,
-  ): Promise<ApiResponse<PaginatedResponse<ApiDistrict>>> {
+  ): Promise<ApiResponse<AllResponse<ApiDistrict>>> {
     try {
       const filters: LocationFilterRequest = {
         name: searchTerm,
@@ -199,7 +206,7 @@ export class LocationApiService {
   async searchTehsils(
     searchTerm: string,
     districtId?: string,
-  ): Promise<ApiResponse<PaginatedResponse<ApiTehsil>>> {
+  ): Promise<ApiResponse<AllResponse<ApiTehsil>>> {
     try {
       const filters: LocationFilterRequest = {
         name: searchTerm,
@@ -226,7 +233,7 @@ export class LocationApiService {
   async searchVillages(
     searchTerm: string,
     tehsilId?: string,
-  ): Promise<ApiResponse<PaginatedResponse<ApiVillage>>> {
+  ): Promise<ApiResponse<AllResponse<ApiVillage>>> {
     try {
       const filters: LocationFilterRequest = {
         name: searchTerm,
@@ -250,7 +257,7 @@ export class LocationApiService {
   /**
    * Get all districts (for dropdown/selector)
    */
-  async getAllDistricts(): Promise<ApiResponse<ApiDistrict[]>> {
+  async getAllDistricts(): Promise<ApiResponse<ApiDistrict>> {
     try {
       const response = await this.getDistricts({
         page: 1,
@@ -262,7 +269,7 @@ export class LocationApiService {
       if (response.success && response.data) {
         return {
           success: true,
-          data: response.data.items,
+          data: response.data.data.districts,
         };
       }
 

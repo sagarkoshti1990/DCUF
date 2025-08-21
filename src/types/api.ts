@@ -1,29 +1,40 @@
 // API Request and Response Types
 
+import { District, Tehsil, Village } from '.';
+
 // Base API Response Structure
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
+  responseCode?: string;
+  params?: Record<string, any>;
   error?: string;
   errors?: Record<string, string[]>;
 }
 
 // Pagination Types
 export interface PaginationParams {
+  total: number;
   page?: number;
   limit?: number;
-  sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
+  totalPages?: number;
+  hasNext?: boolean;
+  hasPrevious?: boolean;
 }
 
-export interface PaginatedResponse<T> {
-  items: T[];
-  totalItems: number;
+export interface AllResponse<T> {
+  data: T;
+  pagination: PaginationParams;
+}
+
+export interface PaginatedResponse {
+  total: number;
+  page: number;
+  limit: number;
   totalPages: number;
-  currentPage: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
+  hasNext: boolean;
+  hasPrevious: boolean;
 }
 
 // Authentication Types
@@ -46,9 +57,11 @@ export interface AuthTokens {
 }
 
 export interface LoginResponse {
-  user: ApiUser;
-  accessToken: string;
-  refreshToken: string;
+  data: {
+    user: ApiUser;
+    accessToken: string;
+    refreshToken: string;
+  };
 }
 
 // User Types (API Structure)
@@ -84,29 +97,15 @@ export interface UpdateUserRequest {
 
 // Location Types (API Structure)
 export interface ApiDistrict {
-  id: string;
-  name: string;
-  state?: string;
-  createdAt: string;
-  updatedAt: string;
+  districts: District[];
 }
 
 export interface ApiTehsil {
-  id: string;
-  name: string;
-  districtId: string;
-  district?: ApiDistrict;
-  createdAt: string;
-  updatedAt: string;
+  tehsils: Tehsil[];
 }
 
 export interface ApiVillage {
-  id: string;
-  name: string;
-  tehsilId: string;
-  tehsil?: ApiTehsil;
-  createdAt: string;
-  updatedAt: string;
+  villages: Village[];
 }
 
 export interface LocationFilterRequest {
@@ -121,6 +120,7 @@ export interface LocationFilterRequest {
 
 // Word and Language Types
 export interface ApiLanguage {
+  id: string; // Added for component compatibility
   languageId: string; // Changed from 'id' to 'languageId' to match API response
   name: string;
   code?: string; // Made optional since it's not in the API response
@@ -133,10 +133,10 @@ export interface ApiLanguage {
 
 // Updated to match the new API response structure
 export interface ApiWord {
-  wordId: string; // Changed from 'id' to 'wordId'
+  wordId: string; // This is the main ID from API
   languageId: string;
   word: string; // This is the actual word text (could be in any language)
-  categoryId?: string | null; // Changed from 'category' to 'categoryId' and made nullable
+  categoryId?: string | null; // Changed to match API response
   status: 'active' | 'inactive'; // Added status field
   // Legacy fields for backward compatibility (will be populated by conversion function)
   id?: string;
@@ -161,20 +161,36 @@ export interface WordFilterRequest {
 // Submission Types (API Structure)
 export interface ApiSubmission {
   id: string;
+  submissionId?: string; // Original field from API
   wordId: string;
-  word?: ApiWord;
+  word?: {
+    word: string;
+    english?: string; // Legacy compatibility
+  };
   synonyms: string;
-  audioUrl?: string;
+  audioUrl?: string | null;
   villageId: string;
-  village?: ApiVillage;
+  village?: {
+    name: string;
+  };
   tehsilId: string;
-  tehsil?: ApiTehsil;
+  tehsil?: {
+    name: string;
+  };
   districtId: string;
-  district?: ApiDistrict;
+  district?: {
+    name: string;
+  };
   languageId: string;
-  language?: ApiLanguage;
+  language?: {
+    name: string;
+    id?: string; // For component compatibility
+  };
   userId: string;
-  user?: ApiUser;
+  user?: {
+    fName: string;
+    lName: string;
+  };
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;

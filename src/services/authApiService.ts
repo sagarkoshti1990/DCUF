@@ -81,7 +81,7 @@ export class AuthApiService {
       if (response.success && response.data) {
         // Store authentication data
         await this.storeAuthData(response.data);
-        console.log('✅ Login successful:', response.data.user.email);
+        console.log('✅ Login successful:', response.data.data.user.email);
 
         return response;
       } else {
@@ -209,10 +209,16 @@ export class AuthApiService {
       await Promise.all([
         AsyncStorage.setItem(
           STORAGE_KEYS.USER_DATA,
-          JSON.stringify(authData.user),
+          JSON.stringify(authData.data.user),
         ),
-        AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.accessToken),
-        AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, authData.refreshToken),
+        AsyncStorage.setItem(
+          STORAGE_KEYS.AUTH_TOKEN,
+          authData.data.accessToken,
+        ),
+        AsyncStorage.setItem(
+          STORAGE_KEYS.REFRESH_TOKEN,
+          authData.data.refreshToken,
+        ),
       ]);
     } catch (error) {
       console.error('Failed to store auth data:', error);

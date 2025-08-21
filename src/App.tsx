@@ -58,7 +58,7 @@ function App(): React.JSX.Element {
 
         // Initialize API service with configuration
         await apiService.initialize({
-          baseUrl: 'https://59312d0a3250.ngrok-free.app',
+          baseUrl: 'https://rlapi.tekdinext.com',
         });
 
         // Test the new words API
