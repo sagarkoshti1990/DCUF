@@ -1,7 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Card, Text, Button, Menu } from 'react-native-paper';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import {
+  Card,
+  Text,
+  Button,
+  ActivityIndicator,
+  Divider,
+  Surface,
+} from 'react-native-paper';
 import { District, Tehsil, Village } from '../types';
+import { ApiDistrict, ApiTehsil, ApiVillage } from '../types/api';
+import { apiService } from '../services/apiService';
 import {
   mockDistricts,
   mockTehsils,
@@ -15,7 +30,122 @@ interface LocationSelectorProps {
   onDistrictChange: (district: District | null) => void;
   onTehsilChange: (tehsil: Tehsil | null) => void;
   onVillageChange: (village: Village | null) => void;
+  useApi?: boolean; // Flag to switch between API and mock data
 }
+
+// Helper functions to convert between API and legacy types
+// We preserve the original API ID as a string in a custom property
+const convertApiDistrictToLegacy = (
+  apiDistrict: ApiDistrict,
+): District & { apiId?: string } => ({
+  id: parseInt(apiDistrict.id, 10) || 0,
+  name: apiDistrict.name,
+  state: apiDistrict.state || 'Maharashtra',
+  apiId: apiDistrict.id, // Preserve original UUID
+});
+
+const convertApiTehsilToLegacy = (
+  apiTehsil: ApiTehsil,
+): Tehsil & { apiId?: string } => ({
+  id: parseInt(apiTehsil.id, 10) || 0,
+  name: apiTehsil.name,
+  districtId: parseInt(apiTehsil.districtId, 10) || 0,
+  apiId: apiTehsil.id, // Preserve original UUID
+});
+
+const convertApiVillageToLegacy = (
+  apiVillage: ApiVillage,
+): Village & { apiId?: string } => ({
+  id: parseInt(apiVillage.id, 10) || 0,
+  name: apiVillage.name,
+  tehsilId: parseInt(apiVillage.tehsilId, 10) || 0,
+  apiId: apiVillage.id, // Preserve original UUID
+});
+
+// Custom Modal Picker Component
+interface ModalPickerProps {
+  visible: boolean;
+  title: string;
+  items: Array<{ id: number; name: string }>;
+  selectedItem: { id: number; name: string } | null;
+  onSelect: (item: any) => void;
+  onDismiss: () => void;
+  loading?: boolean;
+  emptyMessage?: string;
+}
+
+const ModalPicker: React.FC<ModalPickerProps> = ({
+  visible,
+  title,
+  items,
+  selectedItem,
+  onSelect,
+  onDismiss,
+  loading = false,
+  emptyMessage = 'No items available',
+}) => {
+  return (
+    <Modal
+      visible={visible}
+      onDismiss={onDismiss}
+      transparent={true}
+      animationType="fade"
+    >
+      <View style={styles.modalContainer}>
+        <Surface style={styles.modalSurface}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Divider style={styles.modalDivider} />
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" />
+              <Text style={styles.loadingText}>Loading...</Text>
+            </View>
+          ) : items.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>{emptyMessage}</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.modalScroll}>
+              {items.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.modalItem,
+                    selectedItem?.id === item.id && styles.selectedModalItem,
+                  ]}
+                  onPress={() => {
+                    onSelect(item);
+                    onDismiss();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      selectedItem?.id === item.id &&
+                        styles.selectedModalItemText,
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          <Divider style={styles.modalDivider} />
+          <Button
+            mode="outlined"
+            onPress={onDismiss}
+            style={styles.modalCloseButton}
+          >
+            Close
+          </Button>
+        </Surface>
+      </View>
+    </Modal>
+  );
+};
 
 const LocationSelector: React.FC<LocationSelectorProps> = ({
   selectedDistrict,
@@ -24,195 +154,406 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   onDistrictChange,
   onTehsilChange,
   onVillageChange,
+  useApi = true, // Default to using API
 }) => {
+  const [availableDistricts, setAvailableDistricts] = useState<District[]>([]);
   const [availableTehsils, setAvailableTehsils] = useState<Tehsil[]>([]);
   const [availableVillages, setAvailableVillages] = useState<Village[]>([]);
+
+  // Loading states
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingTehsils, setLoadingTehsils] = useState(false);
+  const [loadingVillages, setLoadingVillages] = useState(false);
 
   // Menu visibility states
   const [districtMenuVisible, setDistrictMenuVisible] = useState(false);
   const [tehsilMenuVisible, setTehsilMenuVisible] = useState(false);
   const [villageMenuVisible, setVillageMenuVisible] = useState(false);
 
+  // Load districts
+  const loadDistricts = useCallback(async () => {
+    if (!useApi) {
+      setAvailableDistricts(mockDistricts);
+      return;
+    }
+
+    setLoadingDistricts(true);
+    try {
+      const response = await apiService.locations.getAllDistricts();
+      if (response.success && response.data) {
+        const legacyDistricts = response.data.map(convertApiDistrictToLegacy);
+        setAvailableDistricts(legacyDistricts);
+      } else {
+        console.warn(
+          'Failed to load districts from API, falling back to mock data',
+        );
+        setAvailableDistricts(mockDistricts);
+      }
+    } catch (error) {
+      console.error('Error loading districts:', error);
+      setAvailableDistricts(mockDistricts);
+    } finally {
+      setLoadingDistricts(false);
+    }
+  }, [useApi]);
+
+  // Load tehsils for selected district
+  const loadTehsils = useCallback(
+    async (districtId: number) => {
+      if (!useApi) {
+        const filteredTehsils = mockTehsils.filter(
+          tehsil => tehsil.districtId === districtId,
+        );
+        setAvailableTehsils(filteredTehsils);
+        return;
+      }
+
+      setLoadingTehsils(true);
+      try {
+        const response = await apiService.locations.getTehsilsByDistrict(
+          districtId.toString(),
+        );
+        if (response.success && response.data) {
+          const legacyTehsils = response.data.items.map(
+            convertApiTehsilToLegacy,
+          );
+          setAvailableTehsils(legacyTehsils);
+        } else {
+          console.warn(
+            'Failed to load tehsils from API, falling back to mock data',
+          );
+          const filteredTehsils = mockTehsils.filter(
+            tehsil => tehsil.districtId === districtId,
+          );
+          setAvailableTehsils(filteredTehsils);
+        }
+      } catch (error) {
+        console.error('Error loading tehsils:', error);
+        const filteredTehsils = mockTehsils.filter(
+          tehsil => tehsil.districtId === districtId,
+        );
+        setAvailableTehsils(filteredTehsils);
+      } finally {
+        setLoadingTehsils(false);
+      }
+    },
+    [useApi],
+  );
+
+  // Load villages for selected tehsil
+  const loadVillages = useCallback(
+    async (tehsilId: number) => {
+      if (!useApi) {
+        const filteredVillages = mockVillages.filter(
+          village => village.tehsilId === tehsilId,
+        );
+        setAvailableVillages(filteredVillages);
+        return;
+      }
+
+      setLoadingVillages(true);
+      try {
+        const response = await apiService.locations.getVillagesByTehsil(
+          tehsilId.toString(),
+        );
+        if (response.success && response.data) {
+          const legacyVillages = response.data.items.map(
+            convertApiVillageToLegacy,
+          );
+          setAvailableVillages(legacyVillages);
+        } else {
+          console.warn(
+            'Failed to load villages from API, falling back to mock data',
+          );
+          const filteredVillages = mockVillages.filter(
+            village => village.tehsilId === tehsilId,
+          );
+          setAvailableVillages(filteredVillages);
+        }
+      } catch (error) {
+        console.error('Error loading villages:', error);
+        const filteredVillages = mockVillages.filter(
+          village => village.tehsilId === tehsilId,
+        );
+        setAvailableVillages(filteredVillages);
+      } finally {
+        setLoadingVillages(false);
+      }
+    },
+    [useApi],
+  );
+
+  // Handle district selection
+  const handleDistrictSelect = useCallback(
+    (district: District) => {
+      onDistrictChange(district);
+      setDistrictMenuVisible(false);
+      setTehsilMenuVisible(false);
+      setVillageMenuVisible(false);
+      loadTehsils(district.id);
+      onTehsilChange(null);
+      onVillageChange(null);
+    },
+    [onDistrictChange, loadTehsils, onTehsilChange, onVillageChange],
+  );
+
+  // Handle tehsil selection
+  const handleTehsilSelect = useCallback(
+    (tehsil: Tehsil) => {
+      onTehsilChange(tehsil);
+      setTehsilMenuVisible(false);
+      setVillageMenuVisible(false);
+      loadVillages(tehsil.id);
+      onVillageChange(null);
+    },
+    [onTehsilChange, loadVillages, onVillageChange],
+  );
+
+  // Handle village selection
+  const handleVillageSelect = useCallback(
+    (village: Village) => {
+      onVillageChange(village);
+      setVillageMenuVisible(false);
+    },
+    [onVillageChange],
+  );
+
+  // Load districts on component mount
+  useEffect(() => {
+    loadDistricts();
+  }, [loadDistricts]);
+
   // Update available tehsils when district changes
   useEffect(() => {
     if (selectedDistrict) {
-      const filteredTehsils = mockTehsils.filter(
-        tehsil => tehsil.districtId === selectedDistrict.id,
-      );
-      setAvailableTehsils(filteredTehsils);
+      loadTehsils(selectedDistrict.id);
     } else {
       setAvailableTehsils([]);
     }
     // Reset tehsil and village when district changes
     onTehsilChange(null);
     onVillageChange(null);
-  }, [selectedDistrict, onTehsilChange, onVillageChange]);
+  }, [selectedDistrict, loadTehsils, onTehsilChange, onVillageChange]);
 
   // Update available villages when tehsil changes
   useEffect(() => {
     if (selectedTehsil) {
-      const filteredVillages = mockVillages.filter(
-        village => village.tehsilId === selectedTehsil.id,
-      );
-      setAvailableVillages(filteredVillages);
+      loadVillages(selectedTehsil.id);
     } else {
       setAvailableVillages([]);
     }
     // Reset village when tehsil changes
     onVillageChange(null);
-  }, [selectedTehsil, onVillageChange]);
-
-  const handleDistrictSelect = (district: District) => {
-    onDistrictChange(district);
-    setDistrictMenuVisible(false);
-  };
-
-  const handleTehsilSelect = (tehsil: Tehsil) => {
-    onTehsilChange(tehsil);
-    setTehsilMenuVisible(false);
-  };
-
-  const handleVillageSelect = (village: Village) => {
-    onVillageChange(village);
-    setVillageMenuVisible(false);
-  };
+  }, [selectedTehsil, loadVillages, onVillageChange]);
 
   return (
     <Card style={styles.card}>
       <Card.Content>
-        <Text variant="titleMedium" style={styles.title}>
-          Select Location
-        </Text>
+        <Text style={styles.title}>Select Location</Text>
+        <Text style={styles.subtitle}>Choose District → Tehsil → Village</Text>
 
-        {/* District Dropdown */}
-        <View style={styles.dropdownContainer}>
-          <Text style={styles.label}>District *</Text>
-          <Menu
-            visible={districtMenuVisible}
-            onDismiss={() => setDistrictMenuVisible(false)}
-            anchor={
-              <Button
-                mode="outlined"
-                onPress={() => setDistrictMenuVisible(true)}
-                style={styles.dropdownButton}
-                contentStyle={styles.dropdownButtonContent}
-                icon="chevron-down"
-              >
-                {selectedDistrict
-                  ? selectedDistrict.name
-                  : 'Select District...'}
-              </Button>
-            }
+        {/* District Selector */}
+        <View style={styles.selectorContainer}>
+          <Text style={styles.label}>District</Text>
+          <Button
+            mode="outlined"
+            onPress={() => setDistrictMenuVisible(true)}
+            style={styles.button}
+            disabled={loadingDistricts}
+            icon={loadingDistricts ? undefined : 'chevron-down'}
           >
-            {mockDistricts.map(district => (
-              <Menu.Item
-                key={district.id}
-                title={district.name}
-                onPress={() => handleDistrictSelect(district)}
-              />
-            ))}
-          </Menu>
+            {loadingDistricts ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              selectedDistrict?.name || 'Select District'
+            )}
+          </Button>
         </View>
 
-        {/* Tehsil Dropdown */}
-        <View style={styles.dropdownContainer}>
-          <Text style={styles.label}>Tehsil *</Text>
-          <Menu
-            visible={tehsilMenuVisible}
-            onDismiss={() => setTehsilMenuVisible(false)}
-            anchor={
-              <Button
-                mode="outlined"
-                onPress={() => setTehsilMenuVisible(true)}
-                style={styles.dropdownButton}
-                contentStyle={styles.dropdownButtonContent}
-                icon="chevron-down"
-                disabled={!selectedDistrict}
-              >
-                {selectedTehsil
-                  ? selectedTehsil.name
-                  : selectedDistrict
-                  ? 'Select Tehsil...'
-                  : 'Select District first'}
-              </Button>
-            }
+        {/* Tehsil Selector */}
+        <View style={styles.selectorContainer}>
+          <Text style={styles.label}>Tehsil</Text>
+          <Button
+            mode="outlined"
+            onPress={() => setTehsilMenuVisible(true)}
+            style={styles.button}
+            disabled={!selectedDistrict || loadingTehsils}
+            icon={loadingTehsils ? undefined : 'chevron-down'}
           >
-            {availableTehsils.map(tehsil => (
-              <Menu.Item
-                key={tehsil.id}
-                title={tehsil.name}
-                onPress={() => handleTehsilSelect(tehsil)}
-              />
-            ))}
-          </Menu>
+            {loadingTehsils ? (
+              <ActivityIndicator size="small" />
+            ) : !selectedDistrict ? (
+              'Select District First'
+            ) : (
+              selectedTehsil?.name || 'Select Tehsil'
+            )}
+          </Button>
         </View>
 
-        {/* Village Dropdown */}
-        <View style={styles.dropdownContainer}>
-          <Text style={styles.label}>Village *</Text>
-          <Menu
-            visible={villageMenuVisible}
-            onDismiss={() => setVillageMenuVisible(false)}
-            anchor={
-              <Button
-                mode="outlined"
-                onPress={() => setVillageMenuVisible(true)}
-                style={styles.dropdownButton}
-                contentStyle={styles.dropdownButtonContent}
-                icon="chevron-down"
-                disabled={!selectedTehsil}
-              >
-                {selectedVillage
-                  ? selectedVillage.name
-                  : selectedTehsil
-                  ? 'Select Village...'
-                  : 'Select Tehsil first'}
-              </Button>
-            }
+        {/* Village Selector */}
+        <View style={styles.selectorContainer}>
+          <Text style={styles.label}>Village</Text>
+          <Button
+            mode="outlined"
+            onPress={() => setVillageMenuVisible(true)}
+            style={styles.button}
+            disabled={!selectedTehsil || loadingVillages}
+            icon={loadingVillages ? undefined : 'chevron-down'}
           >
-            {availableVillages.map(village => (
-              <Menu.Item
-                key={village.id}
-                title={village.name}
-                onPress={() => handleVillageSelect(village)}
-              />
-            ))}
-          </Menu>
+            {loadingVillages ? (
+              <ActivityIndicator size="small" />
+            ) : !selectedTehsil ? (
+              'Select Tehsil First'
+            ) : (
+              selectedVillage?.name || 'Select Village'
+            )}
+          </Button>
         </View>
       </Card.Content>
+
+      <ModalPicker
+        visible={districtMenuVisible}
+        title="Select District"
+        items={availableDistricts.map(d => ({ id: d.id, name: d.name }))}
+        selectedItem={
+          selectedDistrict
+            ? { id: selectedDistrict.id, name: selectedDistrict.name }
+            : null
+        }
+        onSelect={handleDistrictSelect}
+        onDismiss={() => setDistrictMenuVisible(false)}
+        loading={loadingDistricts}
+        emptyMessage="No districts available"
+      />
+
+      <ModalPicker
+        visible={tehsilMenuVisible}
+        title="Select Tehsil"
+        items={availableTehsils.map(t => ({ id: t.id, name: t.name }))}
+        selectedItem={
+          selectedTehsil
+            ? { id: selectedTehsil.id, name: selectedTehsil.name }
+            : null
+        }
+        onSelect={handleTehsilSelect}
+        onDismiss={() => setTehsilMenuVisible(false)}
+        loading={loadingTehsils}
+        emptyMessage="No tehsils available for this district"
+      />
+
+      <ModalPicker
+        visible={villageMenuVisible}
+        title="Select Village"
+        items={availableVillages.map(v => ({ id: v.id, name: v.name }))}
+        selectedItem={
+          selectedVillage
+            ? { id: selectedVillage.id, name: selectedVillage.name }
+            : null
+        }
+        onSelect={handleVillageSelect}
+        onDismiss={() => setVillageMenuVisible(false)}
+        loading={loadingVillages}
+        emptyMessage="No villages available for this tehsil"
+      />
     </Card>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    margin: 16,
+    marginBottom: 16,
     elevation: 2,
   },
   title: {
-    marginBottom: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 4,
   },
-  dropdownContainer: {
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 16,
+  },
+  selectorContainer: {
+    marginBottom: 12,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     marginBottom: 8,
     color: '#333',
   },
-  dropdownButton: {
+  button: {
     justifyContent: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#ddd',
+  },
+  menuContent: {
+    maxHeight: 300,
+  },
+  emptyOptionText: {
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  // New styles for ModalPicker
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalSurface: {
+    width: '90%',
     borderRadius: 8,
+    padding: 20,
     backgroundColor: '#fff',
   },
-  dropdownButtonContent: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalDivider: {
+    marginVertical: 10,
+  },
+  loadingContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+  },
+  modalScroll: {
+    maxHeight: 250,
+  },
+  modalItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+  },
+  selectedModalItem: {
+    backgroundColor: '#e0e0e0',
+  },
+  modalItemText: {
+    fontSize: 16,
+  },
+  selectedModalItemText: {
+    fontWeight: 'bold',
+  },
+  modalCloseButton: {
+    marginTop: 15,
   },
 });
 

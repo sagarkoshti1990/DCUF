@@ -1,11 +1,15 @@
-// User and Authentication Types
+// Re-export all API types for convenience
+export * from './api';
+
+// Legacy User and Authentication Types (maintained for backward compatibility)
 export interface User {
-  id: number;
-  workerID: string;
-  name: string;
-  assignedVillage: Village | null;
-  role: 'data_collector' | 'admin';
-  loginTime?: string;
+  id: string;
+  username: string;
+  email: string;
+  fName: string;
+  lName: string;
+  role: 'WORKER' | 'ADMIN';
+  status: 'active' | 'inactive';
 }
 
 export interface AuthResponse {
@@ -18,7 +22,7 @@ export interface AuthResponse {
   error?: any;
 }
 
-// Location Types
+// Legacy Location Types (maintained for backward compatibility)
 export interface District {
   id: number;
   name: string;
@@ -37,13 +41,14 @@ export interface Village {
   tehsilId: number;
 }
 
-// Word and Submission Types
+// Legacy Word and Submission Types (maintained for backward compatibility)
 export interface MasterWord {
   id: number;
   english: string;
   marathi?: string;
   hindi?: string;
   category: string;
+  apiId?: string; // API UUID for new API integration
 }
 
 export interface Submission {
@@ -80,8 +85,9 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
+  Home: undefined;
   DataEntry: undefined;
-  Progress: undefined;
+  Submissions: undefined;
   Settings: undefined;
 };
 
@@ -104,4 +110,31 @@ export interface AudioRecorderProps {
 export interface SubmissionFormProps {
   onSubmit: (data: Partial<Submission>) => void;
   loading?: boolean;
+}
+
+// API Service Interface Types
+export interface ApiServiceInterface {
+  auth: any;
+  users: any;
+  locations: any;
+  submissions: any;
+  words: any;
+  languages: any;
+}
+
+// Migration Helper Types
+export interface LegacyToApiMapping {
+  // Helper types for mapping between legacy and new API types
+  user: {
+    legacy: User;
+    api: import('./api').ApiUser;
+  };
+  district: {
+    legacy: District;
+    api: import('./api').ApiDistrict;
+  };
+  submission: {
+    legacy: Submission;
+    api: import('./api').ApiSubmission;
+  };
 }

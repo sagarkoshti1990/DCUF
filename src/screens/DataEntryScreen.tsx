@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Button, Text, Divider } from 'react-native-paper';
+import { Button, Text, Divider, useTheme } from 'react-native-paper';
 import { District, Tehsil, Village, MasterWord, Submission } from '../types';
+import { ApiLanguage } from '../types/api';
 import { useAppContext } from '../context/AppContext';
+import { apiService } from '../services/apiService';
 import LocationSelector from '../components/LocationSelector';
-import MasterWordDropdown from '../components/MasterWordDropdown';
+import LanguageWordSelector from '../components/LanguageWordSelector';
 import RegionalWordInput from '../components/RegionalWordInput';
 import AudioRecorder from '../components/AudioRecorder';
 
 const DataEntryScreen: React.FC = () => {
   const { state, actions } = useAppContext();
+  const theme = useTheme();
 
   // Form state
+  const [selectedLanguage, setSelectedLanguage] = useState<ApiLanguage | null>(
+    null,
+  );
   const [selectedDistrict, setSelectedDistrict] = useState<District | null>(
     null,
   );
@@ -20,19 +26,126 @@ const DataEntryScreen: React.FC = () => {
   const [selectedWord, setSelectedWord] = useState<MasterWord | null>(null);
   const [regionalWord, setRegionalWord] = useState('');
   const [audioFilePath, setAudioFilePath] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [_isRecording, _setIsRecording] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset word selection when language changes
+  const handleLanguageChange = (language: ApiLanguage) => {
+    setSelectedLanguage(language);
+    setSelectedWord(null); // Reset word selection when language changes
+  };
+
+  // Styles using theme
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    content: {
+      padding: 16,
+    },
+    header: {
+      marginBottom: 16,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: theme.colors.onBackground,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 8,
+    },
+    userInfo: {
+      fontSize: 12,
+      color: theme.colors.onSurfaceVariant,
+    },
+    progressContainer: {
+      marginBottom: 20,
+    },
+    progressBar: {
+      height: 8,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 4,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: theme.colors.primary,
+      borderRadius: 4,
+    },
+    divider: {
+      marginVertical: 8,
+    },
+    submitButton: {
+      marginTop: 20,
+      marginBottom: 16,
+    },
+    submitButtonContent: {
+      height: 56,
+    },
+    offlineIndicator: {
+      textAlign: 'center',
+      color: '#f39c12',
+      fontSize: 12,
+      marginBottom: 8,
+    },
+    errorIndicator: {
+      textAlign: 'center',
+      color: theme.colors.error,
+      fontSize: 12,
+      marginBottom: 8,
+    },
+    statsContainer: {
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    statsText: {
+      fontSize: 14,
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 4,
+    },
+    offlineStatsText: {
+      fontSize: 12,
+      color: '#e67e22',
+    },
+  });
 
   // Validation
   const isFormValid = () => {
     return (
+      selectedLanguage &&
       selectedDistrict &&
       selectedTehsil &&
       selectedVillage &&
       selectedWord &&
       regionalWord.trim().length >= 2 &&
-      audioFilePath
+      (audioFilePath || audioBlob)
     );
+  };
+
+  // Handle audio recording completion
+  const handleAudioRecordingComplete = (filePath: string, blob?: Blob) => {
+    setAudioFilePath(filePath);
+    if (blob) {
+      setAudioBlob(blob);
+    }
+  };
+
+  // Reset form function
+  const resetForm = () => {
+    setSelectedLanguage(null);
+    setSelectedDistrict(null);
+    setSelectedTehsil(null);
+    setSelectedVillage(null);
+    setSelectedWord(null);
+    setRegionalWord('');
+    setAudioFilePath('');
+    setAudioBlob(null);
   };
 
   // Handle form submission
@@ -53,206 +166,266 @@ const DataEntryScreen: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Create submission object
-      const submission: Omit<Submission, 'id'> = {
-        masterWordId: selectedWord!.id,
-        regionalWord: regionalWord.trim(),
-        audioFilePath,
-        locationId: selectedVillage!.id,
-        workerId: state.user.id,
-        timestamp: new Date().toISOString(),
-        synced: false, // Will be synced later
+      // Helper function to get the correct ID (API UUID if available, otherwise legacy ID)
+      const getCorrectId = (item: any): string => {
+        return (item as any).apiId || item.id.toString();
       };
 
-      // Add to context (this would normally call an API)
-      actions.addSubmission({
-        ...submission,
-        id: `submission_${Date.now()}_${Math.random()
-          .toString(36)
-          .substr(2, 9)}`,
-      } as Submission);
+      // Prepare submission data with proper ID handling
+      const submissionData = {
+        wordId: getCorrectId(selectedWord!),
+        synonyms: regionalWord.trim(),
+        villageId: getCorrectId(selectedVillage!),
+        tehsilId: getCorrectId(selectedTehsil!),
+        districtId: getCorrectId(selectedDistrict!),
+        languageId: selectedLanguage!.languageId, // Use languageId instead of id
+      };
+
+      console.log('📝 Submitting with data:', submissionData);
+
+      let response;
+
+      if (audioBlob) {
+        // Submit with audio file upload
+        console.log('🎵 Submitting with audio file upload...');
+        response = await apiService.submissions.submitSubmissionWithUpload({
+          ...submissionData,
+          audioFile: audioBlob,
+        });
+      } else if (audioFilePath) {
+        // Submit with audio URL (if we have a hosted URL)
+        console.log('🎵 Submitting with audio URL...');
+        response = await apiService.submissions.submitSubmission({
+          ...submissionData,
+          audioUrl: audioFilePath,
+        });
+      } else {
+        // Submit without audio
+        console.log('📝 Submitting without audio...');
+        response = await apiService.submissions.submitSubmission(
+          submissionData,
+        );
+      }
+
+      if (response.success) {
+        Alert.alert(
+          'Success!',
+          'Your submission has been recorded successfully.',
+          [
+            {
+              text: 'OK',
+              onPress: resetForm,
+            },
+          ],
+        );
+
+        // Add to local submissions for tracking
+        const legacySubmission: Submission = {
+          id: response.data?.id || Date.now().toString(),
+          masterWordId: selectedWord!.id,
+          regionalWord: regionalWord,
+          audioFilePath: audioFilePath,
+          locationId:
+            typeof selectedVillage!.id === 'string'
+              ? parseInt(selectedVillage!.id)
+              : selectedVillage!.id,
+          workerId:
+            typeof state.user.id === 'string'
+              ? parseInt(state.user.id)
+              : parseInt(state.user.id),
+          timestamp: new Date().toISOString(),
+          synced: true, // Since we successfully submitted to API
+        };
+
+        actions.addSubmission(legacySubmission);
+      } else {
+        // API submission failed, store offline
+        console.warn('API submission failed, storing offline:', response.error);
+
+        const offlineSubmission: Submission = {
+          id: Date.now().toString(),
+          masterWordId: selectedWord!.id,
+          regionalWord: regionalWord,
+          audioFilePath: audioFilePath,
+          locationId:
+            typeof selectedVillage!.id === 'string'
+              ? parseInt(selectedVillage!.id)
+              : selectedVillage!.id,
+          workerId:
+            typeof state.user.id === 'string'
+              ? parseInt(state.user.id)
+              : parseInt(state.user.id),
+          timestamp: new Date().toISOString(),
+          synced: false,
+        };
+
+        actions.addOfflineData(offlineSubmission);
+
+        Alert.alert(
+          'Stored Offline',
+          'Your submission has been saved locally and will be uploaded when connection is restored.',
+          [
+            {
+              text: 'OK',
+              onPress: resetForm,
+            },
+          ],
+        );
+      }
+    } catch (error) {
+      console.error('Submission error:', error);
+
+      // Store offline when there's an error
+      const offlineSubmission: Submission = {
+        id: Date.now().toString(),
+        masterWordId: selectedWord!.id,
+        regionalWord: regionalWord,
+        audioFilePath: audioFilePath,
+        locationId:
+          typeof selectedVillage!.id === 'string'
+            ? parseInt(selectedVillage!.id)
+            : selectedVillage!.id,
+        workerId:
+          typeof state.user.id === 'string'
+            ? parseInt(state.user.id)
+            : parseInt(state.user.id),
+        timestamp: new Date().toISOString(),
+        synced: false,
+      };
+
+      actions.addOfflineData(offlineSubmission);
 
       Alert.alert(
-        'Success!',
-        `Your submission for "${selectedWord!.english}" has been saved.`,
+        'Saved Offline',
+        'Unable to connect to server. Your submission has been saved locally and will be uploaded when connection is restored.',
         [
           {
-            text: 'Continue',
-            onPress: () => {
-              // Reset form for next entry
-              setSelectedWord(null);
-              setRegionalWord('');
-              setAudioFilePath('');
-            },
+            text: 'OK',
+            onPress: resetForm,
           },
         ],
       );
-    } catch (error) {
-      console.error('Submission failed:', error);
-      Alert.alert('Error', 'Failed to submit data. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle form reset
-  const handleReset = () => {
-    Alert.alert(
-      'Reset Form',
-      'Are you sure you want to clear all entered data?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            setSelectedDistrict(null);
-            setSelectedTehsil(null);
-            setSelectedVillage(null);
-            setSelectedWord(null);
-            setRegionalWord('');
-            setAudioFilePath('');
-            setIsRecording(false);
-          },
-        },
-      ],
-    );
+  const getProgress = () => {
+    let completed = 0;
+    const total = 5; // Total required fields (language and word count as one combined step)
+
+    if (selectedLanguage && selectedWord) completed++; // Combined language + word selection
+    if (selectedDistrict) completed++;
+    if (selectedTehsil) completed++;
+    if (selectedVillage) completed++;
+    if (regionalWord.trim().length >= 2 && (audioFilePath || audioBlob))
+      completed++;
+
+    return { completed, total };
   };
+
+  const progress = getProgress();
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          Data Collection
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Record regional language translations
-        </Text>
-      </View>
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Data Collection</Text>
+          <Text style={styles.subtitle}>
+            Step {progress.completed} of {progress.total} completed
+          </Text>
+          {state.user && (
+            <Text style={styles.userInfo}>
+              Welcome, {state.user.fName} {state.user.lName} • {state.user.role}
+            </Text>
+          )}
+        </View>
 
-      {/* Step 1: Location Selection */}
-      <LocationSelector
-        selectedDistrict={selectedDistrict}
-        selectedTehsil={selectedTehsil}
-        selectedVillage={selectedVillage}
-        onDistrictChange={setSelectedDistrict}
-        onTehsilChange={setSelectedTehsil}
-        onVillageChange={setSelectedVillage}
-      />
+        {/* Language & Word Selection */}
+        <LanguageWordSelector
+          selectedLanguage={selectedLanguage}
+          selectedWord={selectedWord}
+          onLanguageSelect={handleLanguageChange}
+          onWordSelect={setSelectedWord}
+          disabled={false}
+          useApi={state.apiInitialized}
+        />
 
-      <Divider style={styles.divider} />
+        <Divider style={styles.divider} />
 
-      {/* Step 2: Master Word Selection */}
-      <MasterWordDropdown
-        selectedWord={selectedWord}
-        onWordSelect={setSelectedWord}
-        disabled={!selectedVillage}
-      />
+        {/* Location Selection */}
+        <LocationSelector
+          selectedDistrict={selectedDistrict}
+          selectedTehsil={selectedTehsil}
+          selectedVillage={selectedVillage}
+          onDistrictChange={setSelectedDistrict}
+          onTehsilChange={setSelectedTehsil}
+          onVillageChange={setSelectedVillage}
+          useApi={state.apiInitialized}
+        />
 
-      <Divider style={styles.divider} />
+        <Divider style={styles.divider} />
 
-      {/* Step 3: Regional Word Input */}
-      <RegionalWordInput
-        value={regionalWord}
-        onChangeText={setRegionalWord}
-        disabled={!selectedWord}
-        selectedMasterWord={selectedWord?.english}
-      />
+        {/* Regional Word Input */}
+        <RegionalWordInput
+          value={regionalWord}
+          onChangeText={setRegionalWord}
+          disabled={false}
+        />
 
-      <Divider style={styles.divider} />
+        <Divider style={styles.divider} />
 
-      {/* Step 4: Audio Recording */}
-      <AudioRecorder
-        onRecordingComplete={setAudioFilePath}
-        isRecording={isRecording}
-        disabled={!selectedWord || !regionalWord.trim()}
-        existingRecording={audioFilePath}
-      />
+        {/* Audio Recording */}
+        <AudioRecorder
+          onRecordingComplete={handleAudioRecordingComplete}
+          isRecording={_isRecording}
+          disabled={false}
+        />
 
-      {/* Form Actions */}
-      <View style={styles.actions}>
-        <Button
-          mode="outlined"
-          onPress={handleReset}
-          disabled={isSubmitting}
-          style={styles.resetButton}
-          contentStyle={styles.buttonContent}
-        >
-          Reset Form
-        </Button>
+        <Divider style={styles.divider} />
 
+        {/* Submit Button */}
         <Button
           mode="contained"
           onPress={handleSubmit}
-          disabled={!isFormValid() || isSubmitting}
           loading={isSubmitting}
+          disabled={!isFormValid() || isSubmitting || _isRecording}
           style={styles.submitButton}
-          contentStyle={styles.buttonContent}
+          contentStyle={styles.submitButtonContent}
+          icon="cloud-upload"
         >
-          {isSubmitting ? 'Submitting...' : 'Submit Entry'}
+          {isSubmitting ? 'Submitting...' : 'Submit Data'}
         </Button>
-      </View>
 
-      {/* Progress Indicator */}
-      <View style={styles.progressContainer}>
-        <Text variant="bodySmall" style={styles.progressText}>
-          Submissions today: {state.submissions.length}
-        </Text>
+        {/* API Status */}
+        {!state.apiInitialized && (
+          <Text style={styles.offlineIndicator}>
+            📡 Working in offline mode - Data will sync when connection is
+            restored
+          </Text>
+        )}
+
+        {state.apiError && (
+          <Text style={styles.errorIndicator}>
+            ⚠️ API Error: {state.apiError}
+          </Text>
+        )}
+
+        {/* Submission Stats */}
+        <View style={styles.statsContainer}>
+          <Text style={styles.statsText}>
+            Total Submissions: {state.submissions.length}
+          </Text>
+          {state.offlineData.length > 0 && (
+            <Text style={styles.offlineStatsText}>
+              Offline Queue: {state.offlineData.length}
+            </Text>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  title: {
-    fontWeight: 'bold',
-    color: '#1976d2',
-  },
-  subtitle: {
-    marginTop: 4,
-    color: '#666',
-  },
-  divider: {
-    marginVertical: 8,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  actions: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    backgroundColor: '#fff',
-    marginTop: 16,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    elevation: 2,
-  },
-  resetButton: {
-    flex: 1,
-  },
-  submitButton: {
-    flex: 2,
-  },
-  buttonContent: {
-    paddingVertical: 8,
-  },
-  progressContainer: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  progressText: {
-    color: '#666',
-  },
-});
 
 export default DataEntryScreen;

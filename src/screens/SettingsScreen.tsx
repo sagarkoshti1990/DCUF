@@ -4,16 +4,45 @@ import {
   List,
   Card,
   Title,
-  Paragraph,
   Button,
   Divider,
   Avatar,
+  Switch,
+  useTheme,
+  Text,
 } from 'react-native-paper';
 import { authService } from '../services/authService';
 import { useAppContext } from '../context/AppContext';
 
+// Render functions moved outside component
+const renderThemeIcon = (props: any) => (
+  <List.Icon {...props} icon="theme-light-dark" />
+);
+const renderSyncIcon = (props: any) => <List.Icon {...props} icon="sync" />;
+const renderChevronRight = (props: any) => (
+  <List.Icon {...props} icon="chevron-right" />
+);
+const renderInfoIcon = (props: any) => (
+  <List.Icon {...props} icon="information" />
+);
+const renderHelpIcon = (props: any) => (
+  <List.Icon {...props} icon="help-circle" />
+);
+
 const SettingsScreen: React.FC = () => {
-  const { state, actions } = useAppContext();
+  const {
+    state: { user, settings },
+    actions,
+  } = useAppContext();
+  const theme = useTheme();
+
+  // Render function for switch component
+  const renderThemeSwitch = () => (
+    <Switch
+      value={settings.theme === 'dark'}
+      onValueChange={handleThemeToggle}
+    />
+  );
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -33,42 +62,68 @@ const SettingsScreen: React.FC = () => {
     ]);
   };
 
-  const user = state.user;
+  const handleThemeToggle = () => {
+    const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    actions.updateSettings({ theme: newTheme });
+  };
 
   if (!user) {
     return (
-      <View style={styles.container}>
-        <Title>No user logged in</Title>
+      <View
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
+        <Title style={{ color: theme.colors.onBackground }}>
+          No user logged in
+        </Title>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       {/* User Profile Card */}
       <Card style={styles.profileCard}>
         <Card.Content>
           <View style={styles.profileContent}>
-            <Avatar.Text size={60} label={user.name.charAt(0)} />
+            <Avatar.Text
+              size={60}
+              label={
+                user.fName && user.fName.length > 0
+                  ? user.fName.charAt(0).toUpperCase()
+                  : '?'
+              }
+            />
             <View style={styles.userInfo}>
-              <Title>{user.name}</Title>
-              <Paragraph>Worker ID: {user.workerID}</Paragraph>
-              <Paragraph>
-                Village: {user.assignedVillage?.name || 'Not assigned'}
-              </Paragraph>
+              <Text variant="titleLarge">
+                {user.fName || 'Unknown'} {user.lName || 'User'}
+              </Text>
+              <Text variant="bodyMedium">
+                Worker ID: {user.username || 'Not assigned'}
+              </Text>
             </View>
           </View>
         </Card.Content>
       </Card>
 
-      {/* Settings Options */}
+      {/* App Settings */}
       <Card style={styles.settingsCard}>
         <Card.Content>
           <List.Item
+            title="Dark Mode"
+            description="Toggle between light and dark theme"
+            left={renderThemeIcon}
+            right={renderThemeSwitch}
+          />
+
+          <Divider />
+
+          <List.Item
             title="Data Sync"
             description="Sync offline submissions"
-            left={props => <List.Icon {...props} icon="sync" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
+            left={renderSyncIcon}
+            right={renderChevronRight}
             onPress={() => {
               // Handle sync
             }}
@@ -79,8 +134,8 @@ const SettingsScreen: React.FC = () => {
           <List.Item
             title="App Info"
             description="Version 1.0.0"
-            left={props => <List.Icon {...props} icon="information" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
+            left={renderInfoIcon}
+            right={renderChevronRight}
           />
 
           <Divider />
@@ -88,8 +143,8 @@ const SettingsScreen: React.FC = () => {
           <List.Item
             title="Help & Support"
             description="Get help and report issues"
-            left={props => <List.Icon {...props} icon="help-circle" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
+            left={renderHelpIcon}
+            right={renderChevronRight}
           />
         </Card.Content>
       </Card>

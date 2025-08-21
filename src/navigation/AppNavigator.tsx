@@ -2,22 +2,18 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { authService } from '../services/authService';
 import { useAppContext } from '../context/AppContext';
 import { RootStackParamList, MainTabParamList } from '../types';
 
 // Import screens
 import LoginScreen from '../screens/LoginScreen';
+import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import DataEntryScreen from '../screens/DataEntryScreen';
+import SubmissionsScreen from '../screens/SubmissionsScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-
-const ProgressScreen: React.FC = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Progress Screen</Text>
-  </View>
-);
 
 const getTabBarIcon = (
   routeName: string,
@@ -27,12 +23,14 @@ const getTabBarIcon = (
 ) => {
   let iconName: string = 'help-outline'; // Default fallback icon
 
-  if (routeName === 'DataEntry') {
+  if (routeName === 'Home') {
     iconName = focused ? 'home' : 'home-outline';
+  } else if (routeName === 'DataEntry') {
+    iconName = focused ? 'add-circle' : 'add-circle-outline';
   } else if (routeName === 'Settings') {
     iconName = focused ? 'settings' : 'settings-outline';
-  } else if (routeName === 'Progress') {
-    iconName = focused ? 'analytics' : 'analytics-outline';
+  } else if (routeName === 'Submissions') {
+    iconName = focused ? 'list' : 'list-outline';
   }
 
   return <Ionicons name={iconName} size={size} color={color} />;
@@ -51,6 +49,13 @@ const MainTabs: React.FC = () => (
     })}
   >
     <Tab.Screen
+      name="Home"
+      component={HomeScreen}
+      options={{
+        title: 'Home',
+      }}
+    />
+    <Tab.Screen
       name="DataEntry"
       component={DataEntryScreen}
       options={{
@@ -58,10 +63,10 @@ const MainTabs: React.FC = () => (
       }}
     />
     <Tab.Screen
-      name="Progress"
-      component={ProgressScreen}
+      name="Submissions"
+      component={SubmissionsScreen}
       options={{
-        title: 'Progress',
+        title: 'Submissions',
       }}
     />
     <Tab.Screen

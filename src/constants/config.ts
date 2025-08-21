@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
 export const STORAGE_KEYS = {
   USER_DATA: '@dcuf_user_data',
   AUTH_TOKEN: '@dcuf_auth_token',
+  REFRESH_TOKEN: '@dcuf_refresh_token',
   SETTINGS: '@dcuf_settings',
   OFFLINE_DATA: '@dcuf_offline_data',
   SUBMISSIONS: '@dcuf_submissions',
