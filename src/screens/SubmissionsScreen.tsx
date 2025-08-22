@@ -343,11 +343,9 @@ const SubmissionsScreen: React.FC = () => {
           {/* Header with word and status */}
           <View style={styles.cardHeader}>
             <View style={styles.wordContainer}>
-              <Text style={styles.wordText}>{wordText}</Text>
+              <Text style={styles.wordText}>{wordText} -</Text>
               {submission.language && (
-                <Chip mode="outlined" compact style={styles.languageChip}>
-                  {submission.language.name}
-                </Chip>
+                <Text style={styles.wordText}>{submission.language.name}</Text>
               )}
             </View>
             <TouchableOpacity
@@ -356,12 +354,12 @@ const SubmissionsScreen: React.FC = () => {
                 { backgroundColor: statusConfig.bgColor },
               ]}
             >
-              <Badge
+              {/* <Badge
                 style={[
                   styles.statusIndicator,
                   { backgroundColor: statusConfig.color },
                 ]}
-              />
+              /> */}
               <Text style={[styles.statusText, { color: statusConfig.color }]}>
                 {submission.status.toUpperCase()}
               </Text>
@@ -371,7 +369,7 @@ const SubmissionsScreen: React.FC = () => {
           {/* Synonyms */}
           <View style={styles.synonymsContainer}>
             <Text style={styles.synonymsLabel}>Synonyms:</Text>
-            <Text style={styles.synonymsText}>{submission.synonyms}</Text>
+            <Text style={styles.wordText}>{submission.synonyms}</Text>
           </View>
 
           {/* Location and Date */}
@@ -700,13 +698,13 @@ const styles = StyleSheet.create({
   audioContainer: {
     flexDirection: 'column', // Changed to column for vertical layout
     alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f0f9eb',
+    // marginTop: 2,
+    // paddingVertical: 0,
+    // paddingHorizontal: 8,
+    backgroundColor: '#e0dcf5', // Changed to a lighter blue that contrasts better
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e1f3d8',
+    borderColor: '#d1d9e3',
   },
   audioMainRow: {
     flexDirection: 'row',
