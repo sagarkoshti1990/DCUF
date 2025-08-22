@@ -22,17 +22,14 @@ interface MasterWordDropdownProps {
 
 // Helper function to convert API word to legacy format
 const convertApiWordToLegacy = (apiWord: ApiWord): MasterWord => {
-  // Since the API doesn't provide English translations, we'll use the word text as display text
-  // and determine which language field to populate based on the content or languageId
-  const wordText = apiWord.word || '';
-
   return {
-    id: parseInt(apiWord.wordId, 10) || 0, // Convert wordId to number for legacy compatibility
-    english: wordText, // Use the word text as the primary display text for now
-    marathi: wordText, // Assuming most words are in Marathi based on your example
-    hindi: '', // Not provided in current API structure
-    category: apiWord.categoryId || 'General', // Using categoryId as category name for now
-    apiId: apiWord.wordId, // Preserve original UUID
+    wordId: apiWord.wordId,
+    languageId: apiWord.languageId,
+    word: apiWord.word || '',
+    categoryId: apiWord.categoryId || null,
+    status: apiWord.status || 'active',
+    createdAt: apiWord.createdAt,
+    updatedAt: apiWord.updatedAt,
   };
 };
 
@@ -53,7 +50,7 @@ const MasterWordDropdown: React.FC<MasterWordDropdownProps> = ({
 
   // Loading states
   const [loadingWords, setLoadingWords] = useState(false);
-  const [_loadingCategories, setLoadingCategories] = useState(false);
+  const [_loadingCategories, _setLoadingCategories] = useState(false);
 
   // Load words based on selected language
   const loadWords = useCallback(async () => {
@@ -100,26 +97,22 @@ const MasterWordDropdown: React.FC<MasterWordDropdownProps> = ({
   }, [useApi, languageId]);
 
   // Load categories based on current words
-  const loadCategories = useCallback(async () => {
-    if (!useApi || !words || words.length === 0) {
+  const loadCategories = useCallback(() => {
+    if (words.length === 0) {
       setCategories([]);
       return;
     }
 
-    setLoadingCategories(true);
-    try {
-      // Extract unique categories from loaded words
-      const uniqueCategories = Array.from(
-        new Set(words.map(word => word.category)),
-      );
-      setCategories(uniqueCategories.sort());
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      setCategories([]);
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, [useApi, words]);
+    // Extract unique categories from loaded words
+    const uniqueCategories = Array.from(
+      new Set(
+        words
+          .map(word => word.categoryId)
+          .filter((cat): cat is string => cat !== null),
+      ),
+    );
+    setCategories(uniqueCategories.sort());
+  }, [words]);
 
   // Load words when language changes
   useEffect(() => {
@@ -142,26 +135,18 @@ const MasterWordDropdown: React.FC<MasterWordDropdownProps> = ({
     }
   }, [useApi, words.length]);
 
-  // Filter words based on search query
+  // Combined filter for words based on search query and selected category
   const filteredWords = useMemo(() => {
     if (!words || !Array.isArray(words)) {
-      console.log('⚠️ MasterWordDropdown - words is not an array:', words);
       return [];
-    }
-
-    if (!searchQuery) {
-      return words;
     }
 
     return words.filter(
       word =>
-        word.english.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (word.marathi &&
-          word.marathi.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (word.hindi &&
-          word.hindi.toLowerCase().includes(searchQuery.toLowerCase())),
+        word.word.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        (!selectedCategory || word.categoryId === selectedCategory),
     );
-  }, [words, searchQuery]);
+  }, [words, searchQuery, selectedCategory]);
 
   const handleWordSelect = (word: MasterWord) => {
     onWordSelect(word);
@@ -178,19 +163,33 @@ const MasterWordDropdown: React.FC<MasterWordDropdownProps> = ({
     setSelectedCategory(null);
   };
 
-  const renderWordItem = ({ item }: { item: MasterWord }) => (
-    <List.Item
-      title={item.english || item.marathi || 'Unknown Word'}
-      description={
-        <View>
-          <Text style={styles.category}>Category: {item.category}</Text>
-          {item.apiId && <Text style={styles.wordId}>ID: {item.apiId}</Text>}
-        </View>
-      }
-      onPress={() => handleWordSelect(item)}
-      style={styles.wordItem}
-    />
-  );
+  const renderWordItem = ({ item }: { item: MasterWord }) => {
+    const isSelected = selectedWord?.wordId === item.wordId;
+
+    return (
+      <List.Item
+        title={item.word || 'Unknown Word'}
+        description={
+          <View>
+            <Text style={styles.category}>
+              Category: {item.categoryId || 'General'}
+            </Text>
+            <Text style={styles.wordId}>ID: {item.wordId}</Text>
+          </View>
+        }
+        onPress={() => handleWordSelect(item)}
+        style={[styles.wordItem, isSelected && styles.selectedWordItem]}
+        titleStyle={isSelected ? styles.selectedWordTitle : undefined}
+        left={
+          isSelected
+            ? props => (
+                <List.Icon {...props} icon="check-circle" color="#1976d2" />
+              )
+            : undefined
+        }
+      />
+    );
+  };
 
   return (
     <Card style={styles.card}>
@@ -208,10 +207,8 @@ const MasterWordDropdown: React.FC<MasterWordDropdownProps> = ({
         {selectedWord && (
           <View style={styles.selectedWordContainer}>
             <List.Item
-              title={
-                selectedWord.english || selectedWord.marathi || 'Selected Word'
-              }
-              description={`Category: ${selectedWord.category || 'General'}`}
+              title={selectedWord.word || 'Selected Word'}
+              description={`Category: ${selectedWord.categoryId || 'General'}`}
               left={props => <List.Icon {...props} icon="book-open-variant" />}
               right={props => (
                 <List.Icon
@@ -298,8 +295,18 @@ const MasterWordDropdown: React.FC<MasterWordDropdownProps> = ({
                           : []
                       }
                       renderItem={renderWordItem}
-                      keyExtractor={item => item.id.toString()}
+                      keyExtractor={item => item.wordId.toString()}
                       showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={10}
+                      windowSize={5}
+                      initialNumToRender={8}
+                      getItemLayout={(data, index) => ({
+                        length: 56, // Approximate height of each item
+                        offset: 56 * index,
+                        index,
+                      })}
                       ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                           <Text style={styles.emptyText}>
@@ -398,10 +405,23 @@ const styles = StyleSheet.create({
   },
   wordsList: {
     maxHeight: 300,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   wordItem: {
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  selectedWordItem: {
+    backgroundColor: '#e0f2f7', // A light blue background for selected items
+    borderLeftWidth: 4,
+    borderLeftColor: '#1976d2', // A blue border for selected items
+  },
+  selectedWordTitle: {
+    fontWeight: 'bold',
+    color: '#1976d2',
   },
   translation: {
     fontSize: 12,

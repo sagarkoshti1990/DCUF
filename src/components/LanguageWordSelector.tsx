@@ -178,18 +178,34 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
     />
   );
 
-  const renderWordItem = ({ item }: { item: MasterWord }) => (
-    <List.Item
-      title={item.word}
-      description={
-        <View>
-          <Text style={styles.status}>Status: {item.status}</Text>
-        </View>
-      }
-      onPress={() => handleWordSelect(item)}
-      style={styles.listItem}
-    />
-  );
+  const renderWordItem = ({ item }: { item: MasterWord }) => {
+    const isSelected = selectedWord?.wordId === item.wordId;
+
+    return (
+      <List.Item
+        title={item.word}
+        description={
+          <View>
+            <Text style={styles.status}>Status: {item.status}</Text>
+          </View>
+        }
+        onPress={() => handleWordSelect(item)}
+        style={[styles.listItem, isSelected && styles.selectedListItem]}
+        titleStyle={isSelected ? styles.selectedItemTitle : undefined}
+        left={
+          isSelected
+            ? props => (
+                <List.Icon
+                  {...props}
+                  icon="check-circle"
+                  color={theme.colors.primary}
+                />
+              )
+            : undefined
+        }
+      />
+    );
+  };
 
   const styles = StyleSheet.create({
     card: {
@@ -225,6 +241,10 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
     },
     listContainer: {
       maxHeight: 200,
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surface,
     },
     listItem: {
       borderBottomWidth: 1,
@@ -251,6 +271,15 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
     },
     disabled: {
       opacity: 0.6,
+    },
+    selectedListItem: {
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    selectedItemTitle: {
+      fontWeight: 'bold',
+      color: theme.colors.primary,
     },
   });
 
@@ -405,6 +434,16 @@ const LanguageWordSelector: React.FC<LanguageWordSelectorProps> = ({
                         renderItem={renderWordItem}
                         keyExtractor={item => item.wordId.toString()}
                         showsVerticalScrollIndicator={true}
+                        nestedScrollEnabled={true}
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={10}
+                        windowSize={5}
+                        initialNumToRender={8}
+                        getItemLayout={(data, index) => ({
+                          length: 56, // Approximate height of each item
+                          offset: 56 * index,
+                          index,
+                        })}
                         ListEmptyComponent={
                           <View style={styles.emptyContainer}>
                             <Text style={styles.emptyText}>

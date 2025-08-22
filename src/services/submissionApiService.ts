@@ -72,7 +72,11 @@ export class SubmissionApiService {
           });
         } else {
           // Web File/Blob format
-          formData.append('audioFile', submissionData.audioFile);
+          formData.append('audioFile', {
+            uri: 'file://' + audioFile, // ensure it has file:// prefix
+            type: 'audio/wav', // or 'audio/mpeg' if mp3
+            name: 'recording.wav',
+          });
         }
       }
 

@@ -170,7 +170,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   // Load tehsils for selected district
   const loadTehsils = useCallback(
     async (districtId: string) => {
-      console.log('🛑 Loading tehsils for district: sagar', districtId);
       if (!useApi) {
         const filteredTehsils = mockTehsils.filter(
           tehsil => tehsil.districtId === districtId,
@@ -257,7 +256,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       setDistrictMenuVisible(false);
       setTehsilMenuVisible(false);
       setVillageMenuVisible(false);
-      loadTehsils(district.districtId);
+      loadTehsils(district?.id || '');
       onTehsilChange(null);
       onVillageChange(null);
     },
@@ -270,7 +269,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       onTehsilChange(tehsil);
       setTehsilMenuVisible(false);
       setVillageMenuVisible(false);
-      loadVillages(tehsil.tehsilId);
+      loadVillages(tehsil?.id || '');
       onVillageChange(null);
     },
     [onTehsilChange, loadVillages, onVillageChange],

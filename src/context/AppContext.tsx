@@ -8,6 +8,7 @@ import React, {
   useMemo,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { STORAGE_KEYS } from '../constants/config';
 import { User, Submission, AppSettings } from '../types';
 import { apiService } from '../services/apiService';
@@ -24,6 +25,9 @@ interface AppState {
   // New API-related state
   apiInitialized: boolean;
   apiError: string | null;
+  // Network connectivity state
+  isConnected: boolean;
+  connectionType: string | null;
 }
 
 // Helper function to convert API user to legacy format
@@ -32,14 +36,17 @@ const convertApiUserToLegacy = (
   apiUser: ApiUser,
   existingLoginTime?: string,
 ): User & { apiId?: string } => {
-  const legacyUser = {
-    id: parseInt(apiUser.id, 10) || 0,
-    workerID: apiUser.email, // Use email as workerID for legacy compatibility
-    name: `${apiUser.fName} ${apiUser.lName}`, // Combine fName and lName
-    assignedVillage: null, // API doesn't have village assignment yet
-    role: (apiUser.role === 'ADMIN' ? 'admin' : 'data_collector') as
-      | 'admin'
-      | 'data_collector', // Convert role
+  const legacyUser: User & { apiId?: string } = {
+    userId: apiUser.id, // Use API id as userId
+    email: apiUser.email,
+    fName: apiUser.fName,
+    lName: apiUser.lName,
+    role: apiUser.role, // Already matches 'WORKER' | 'ADMIN'
+    status: apiUser.status, // Already matches 'active' | 'inactive'
+    createdAt: apiUser.createdAt,
+    updatedAt: apiUser.updatedAt,
+    // Legacy compatibility fields
+    id: apiUser.id, // For backward compatibility
     loginTime: existingLoginTime || new Date().toISOString(), // Preserve existing loginTime to prevent re-renders
     apiId: apiUser.id, // Preserve original API ID for submissions
   };
@@ -52,9 +59,10 @@ const convertApiUserToLegacy = (
       lName: apiUser.lName,
     },
     legacyUser: {
-      id: legacyUser.id,
-      name: legacyUser.name,
-      workerID: legacyUser.workerID,
+      userId: legacyUser.userId,
+      email: legacyUser.email,
+      fName: legacyUser.fName,
+      lName: legacyUser.lName,
       apiId: legacyUser.apiId,
     },
   });
@@ -76,6 +84,9 @@ const initialState: AppState = {
   offlineData: [],
   apiInitialized: false,
   apiError: null,
+  // Network connectivity state
+  isConnected: true,
+  connectionType: null,
 };
 
 // Action types
@@ -88,8 +99,10 @@ export const ACTION_TYPES = {
   UPDATE_SETTINGS: 'UPDATE_SETTINGS',
   ADD_OFFLINE_DATA: 'ADD_OFFLINE_DATA',
   CLEAR_OFFLINE_DATA: 'CLEAR_OFFLINE_DATA',
+  REMOVE_OFFLINE_DATA: 'REMOVE_OFFLINE_DATA',
   SET_API_INITIALIZED: 'SET_API_INITIALIZED',
   SET_API_ERROR: 'SET_API_ERROR',
+  SET_NETWORK_STATUS: 'SET_NETWORK_STATUS',
 } as const;
 
 // Action interfaces
@@ -102,8 +115,13 @@ type AppAction =
   | { type: typeof ACTION_TYPES.UPDATE_SETTINGS; payload: Partial<AppSettings> }
   | { type: typeof ACTION_TYPES.ADD_OFFLINE_DATA; payload: Submission }
   | { type: typeof ACTION_TYPES.CLEAR_OFFLINE_DATA }
+  | { type: typeof ACTION_TYPES.REMOVE_OFFLINE_DATA; payload: string }
   | { type: typeof ACTION_TYPES.SET_API_INITIALIZED; payload: boolean }
-  | { type: typeof ACTION_TYPES.SET_API_ERROR; payload: string | null };
+  | { type: typeof ACTION_TYPES.SET_API_ERROR; payload: string | null }
+  | {
+      type: typeof ACTION_TYPES.SET_NETWORK_STATUS;
+      payload: { isConnected: boolean; connectionType: string | null };
+    };
 
 // Reducer function
 const appReducer = (state: AppState, action: AppAction): AppState => {
@@ -157,6 +175,14 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         offlineData: [],
       };
 
+    case ACTION_TYPES.REMOVE_OFFLINE_DATA:
+      return {
+        ...state,
+        offlineData: state.offlineData.filter(
+          item => item.submissionId !== action.payload,
+        ),
+      };
+
     case ACTION_TYPES.SET_API_INITIALIZED:
       return {
         ...state,
@@ -167,6 +193,13 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return {
         ...state,
         apiError: action.payload,
+      };
+
+    case ACTION_TYPES.SET_NETWORK_STATUS:
+      return {
+        ...state,
+        isConnected: action.payload.isConnected,
+        connectionType: action.payload.connectionType,
       };
 
     default:
@@ -184,6 +217,12 @@ interface AppActions {
   updateSettings: (settings: Partial<AppSettings>) => void;
   addOfflineData: (data: Submission) => void;
   clearOfflineData: () => void;
+  removeOfflineData: (id: string) => void;
+  syncOfflineData: () => Promise<{
+    success: boolean;
+    syncedCount: number;
+    errorCount: number;
+  }>;
   setApiInitialized: (initialized: boolean) => void;
   setApiError: (error: string | null) => void;
   // New API-integrated actions
@@ -193,6 +232,10 @@ interface AppActions {
   ) => Promise<{ success: boolean; error?: string }>;
   checkAuthStatus: () => Promise<boolean>;
   loadInitialData: () => Promise<void>;
+  setNetworkStatus: (status: {
+    isConnected: boolean;
+    connectionType: string | null;
+  }) => void;
 }
 
 // Context interface
@@ -332,6 +375,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, [saveDataToStorage, state.apiInitialized]);
 
+  // Network connectivity monitoring
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      dispatch({
+        type: ACTION_TYPES.SET_NETWORK_STATUS,
+        payload: {
+          isConnected: state.isConnected ?? false,
+          connectionType: state.type,
+        },
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   // Action creators
   const actions: AppActions = {
     setLoading: (loading: boolean) =>
@@ -374,6 +434,114 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     clearOfflineData: () => dispatch({ type: ACTION_TYPES.CLEAR_OFFLINE_DATA }),
 
+    removeOfflineData: (id: string) =>
+      dispatch({ type: ACTION_TYPES.REMOVE_OFFLINE_DATA, payload: id }),
+
+    syncOfflineData: async () => {
+      const offlineSubmissions = [...state.offlineData];
+      let syncedCount = 0;
+      let errorCount = 0;
+
+      for (const submission of offlineSubmissions) {
+        try {
+          let response;
+
+          if (submission.audioUrl) {
+            // Check if audioUrl is a local file path/blob that needs upload
+            const isLocalFile =
+              submission.audioUrl.startsWith('file://') ||
+              submission.audioUrl.startsWith('blob:') ||
+              submission.audioUrl.includes('react-native');
+
+            if (isLocalFile) {
+              // Convert local audio to proper format for upload
+              console.log(
+                '🎵 Syncing submission with audio upload:',
+                submission.submissionId,
+              );
+
+              // For React Native, we need to convert the local file
+              const audioFile = {
+                uri: submission.audioUrl,
+                type: 'audio/m4a', // Default audio type
+                name: `submission_${submission.submissionId}.m4a`,
+              };
+
+              const uploadData = {
+                wordId: submission.wordId,
+                synonyms: submission.synonyms,
+                villageId: submission.villageId,
+                tehsilId: submission.tehsilId,
+                districtId: submission.districtId,
+                languageId: submission.languageId,
+                audioFile: audioFile,
+              };
+
+              response =
+                await apiService.submissions.submitSubmissionWithUpload(
+                  uploadData,
+                );
+            } else {
+              // Use regular submission with audioUrl (already hosted)
+              console.log(
+                '📝 Syncing submission with hosted audio URL:',
+                submission.submissionId,
+              );
+              const apiSubmissionData = {
+                wordId: submission.wordId,
+                synonyms: submission.synonyms,
+                villageId: submission.villageId,
+                tehsilId: submission.tehsilId,
+                districtId: submission.districtId,
+                languageId: submission.languageId,
+                audioUrl: submission.audioUrl,
+              };
+
+              response = await apiService.submissions.submitSubmission(
+                apiSubmissionData,
+              );
+            }
+          } else {
+            // No audio - use regular submission
+            console.log(
+              '📝 Syncing submission without audio:',
+              submission.submissionId,
+            );
+            const apiSubmissionData = {
+              wordId: submission.wordId,
+              synonyms: submission.synonyms,
+              villageId: submission.villageId,
+              tehsilId: submission.tehsilId,
+              districtId: submission.districtId,
+              languageId: submission.languageId,
+            };
+
+            response = await apiService.submissions.submitSubmission(
+              apiSubmissionData,
+            );
+          }
+
+          if (response.success) {
+            dispatch({
+              type: ACTION_TYPES.REMOVE_OFFLINE_DATA,
+              payload: submission.submissionId,
+            });
+            syncedCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          console.error(
+            'Error syncing submission:',
+            submission.submissionId,
+            error,
+          );
+          errorCount++;
+        }
+      }
+      return { success: true, syncedCount, errorCount };
+    },
+
     setApiInitialized: (initialized: boolean) =>
       dispatch({
         type: ACTION_TYPES.SET_API_INITIALIZED,
@@ -393,7 +561,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const response = await apiService.auth.login({ email, password });
 
         if (response.success && response.data) {
-          const legacyUser = convertApiUserToLegacy(response.data.user);
+          const legacyUser = convertApiUserToLegacy(response.data.data.user);
           console.log('✅ API login successful, setting user:', legacyUser);
           dispatch({ type: ACTION_TYPES.SET_USER, payload: legacyUser });
           dispatch({ type: ACTION_TYPES.SET_API_INITIALIZED, payload: true });
@@ -451,6 +619,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
       }
     },
+
+    setNetworkStatus: (status: {
+      isConnected: boolean;
+      connectionType: string | null;
+    }) => dispatch({ type: ACTION_TYPES.SET_NETWORK_STATUS, payload: status }),
   };
 
   return (

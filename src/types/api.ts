@@ -215,7 +215,7 @@ export interface SubmissionWithUploadRequest {
   tehsilId: string;
   districtId: string;
   languageId?: string;
-  audioFile: File | Blob | { uri: string; type: string; name: string }; // Support React Native format
+  audioFile: string | File | Blob | { uri: string; type: string; name: string }; // Support React Native format
 }
 
 export interface UpdateSubmissionRequest {

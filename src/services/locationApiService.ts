@@ -53,6 +53,13 @@ export class LocationApiService {
     filters?: LocationFilterRequest,
   ): Promise<ApiResponse<AllResponse<ApiTehsil>>> {
     try {
+      if (!filters?.districtId) {
+        console.error('❌ District ID is required:', filters);
+        return {
+          success: false,
+          error: 'District ID is required',
+        };
+      }
       const requestBody = {
         page: filters?.page || 1,
         limit: filters?.limit || 15,
@@ -67,7 +74,7 @@ export class LocationApiService {
       );
 
       if (response.success) {
-        console.log('✅ Tehsils fetched successfully:', response.data);
+        console.log('✅ Tehsils fetched successfully:', response.data, filters);
       } else {
         console.error('❌ Failed to fetch tehsils:', response.error);
         return {

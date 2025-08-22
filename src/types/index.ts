@@ -29,6 +29,7 @@ export interface AuthResponse {
 
 // Updated Location Types to match API response structure
 export interface District {
+  id?: string; // Changed from number to string to match API
   districtId: string; // Changed from number to string to match API
   name: string;
   state?: string; // Made optional since it might not be in all API responses
@@ -38,6 +39,7 @@ export interface District {
 }
 
 export interface Tehsil {
+  id?: string; // Changed from number to string to match API
   tehsilId: string;
   name: string;
   districtId: string;
@@ -47,6 +49,7 @@ export interface Tehsil {
 }
 
 export interface Village {
+  id?: string; // Changed from number to string to match API
   villageId: string;
   name: string;
   tehsilId: string;

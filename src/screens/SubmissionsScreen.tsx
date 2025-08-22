@@ -16,6 +16,7 @@ import {
   FAB,
   Badge,
   IconButton,
+  ProgressBar,
 } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -23,6 +24,8 @@ import { useAppContext } from '../context/AppContext';
 import { apiService } from '../services/apiService';
 import { ApiSubmission, SubmissionFilterRequest } from '../types/api';
 import { MainTabParamList } from '../types';
+// Import Sound for audio playback
+import Sound from 'react-native-sound';
 
 type NavigationProp = BottomTabNavigationProp<MainTabParamList, 'Submissions'>;
 
@@ -41,8 +44,45 @@ const SubmissionsScreen: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  // Audio playback state
+  const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
+  const [audioLoadingId, setAudioLoadingId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState<{ [key: string]: number }>(
+    {},
+  );
+  const [audioSounds, setAudioSounds] = useState<{ [key: string]: Sound }>({});
+
   // Add ref to prevent rapid requests
   const lastLoadTimeRef = useRef<number>(0);
+  const progressTimerRef = useRef<{
+    [key: string]: ReturnType<typeof setInterval>;
+  }>({});
+
+  // Initialize Sound library
+  useEffect(() => {
+    Sound.setCategory('Playback');
+
+    // Cleanup function for timers only
+    return () => {
+      // Clear progress timers
+      const timers = progressTimerRef.current;
+      Object.values(timers).forEach(timer => {
+        clearInterval(timer);
+      });
+      progressTimerRef.current = {};
+    };
+  }, []);
+
+  // Separate cleanup for audio sounds
+  useEffect(() => {
+    return () => {
+      // Stop all sounds when component unmounts or audioSounds changes
+      Object.values(audioSounds).forEach(sound => {
+        sound.stop();
+        sound.release();
+      });
+    };
+  }, [audioSounds]);
 
   // Extract stable values to prevent re-render loops
   const userId = state.user?.id;
@@ -87,7 +127,7 @@ const SubmissionsScreen: React.FC = () => {
         // Prepare filter request similar to curl example
         const filters: SubmissionFilterRequest = {
           page: pageNum,
-          limit: 10,
+          limit: 5,
           sortBy: 'createdAt',
           sortOrder: 'DESC',
         };
@@ -180,20 +220,106 @@ const SubmissionsScreen: React.FC = () => {
     // Filter change will trigger useEffect above
   };
 
-  // Handle audio playback
-  const handleAudioPlay = (audioUrl: string, _submissionId: string) => {
-    Alert.alert('Audio Playback', 'Audio playback feature coming soon!', [
-      { text: 'OK', style: 'default' },
-      {
-        text: 'Open URL',
-        style: 'default',
-        onPress: () => {
-          console.log('Audio URL:', audioUrl);
-          // In a real app, you would use a library like react-native-sound or expo-av
-          // For now, just log the URL
-        },
-      },
-    ]);
+  // Handle audio playback with proper implementation
+  const handleAudioPlay = async (audioUrl: string, submissionId: string) => {
+    try {
+      // If currently playing this audio, stop it
+      if (currentPlayingId === submissionId) {
+        const sound = audioSounds[submissionId];
+        if (sound) {
+          sound.stop(() => {
+            setCurrentPlayingId(null);
+            setAudioProgress(prev => ({ ...prev, [submissionId]: 0 }));
+            if (progressTimerRef.current[submissionId]) {
+              clearInterval(progressTimerRef.current[submissionId]);
+              delete progressTimerRef.current[submissionId];
+            }
+          });
+        }
+        return;
+      }
+
+      // Stop any currently playing audio
+      if (currentPlayingId) {
+        const currentSound = audioSounds[currentPlayingId];
+        if (currentSound) {
+          currentSound.stop();
+          setAudioProgress(prev => ({ ...prev, [currentPlayingId]: 0 }));
+          if (progressTimerRef.current[currentPlayingId]) {
+            clearInterval(progressTimerRef.current[currentPlayingId]);
+            delete progressTimerRef.current[currentPlayingId];
+          }
+        }
+      }
+
+      setAudioLoadingId(submissionId);
+      setCurrentPlayingId(null);
+
+      // Create new sound instance
+      const sound = new Sound(audioUrl, '', error => {
+        setAudioLoadingId(null);
+
+        if (error) {
+          console.error('Failed to load sound:', error);
+          Alert.alert(
+            'Audio Error',
+            'Failed to load audio file. Please check your internet connection.',
+          );
+          return;
+        }
+
+        console.log(
+          'Sound loaded successfully, duration:',
+          sound.getDuration(),
+        );
+
+        // Update sounds state
+        setAudioSounds(prev => ({ ...prev, [submissionId]: sound }));
+        setCurrentPlayingId(submissionId);
+        setAudioProgress(prev => ({ ...prev, [submissionId]: 0 }));
+
+        // Start playback
+        sound.play(success => {
+          if (success) {
+            console.log('Audio playback completed successfully');
+          } else {
+            console.log('Audio playback failed');
+            Alert.alert('Playback Error', 'Audio playback failed');
+          }
+
+          // Reset state after playback
+          setCurrentPlayingId(null);
+          setAudioProgress(prev => ({ ...prev, [submissionId]: 0 }));
+          if (progressTimerRef.current[submissionId]) {
+            clearInterval(progressTimerRef.current[submissionId]);
+            delete progressTimerRef.current[submissionId];
+          }
+        });
+
+        // Start progress tracking
+        const duration = sound.getDuration();
+        progressTimerRef.current[submissionId] = setInterval(() => {
+          sound.getCurrentTime(seconds => {
+            const progress = duration > 0 ? seconds / duration : 0;
+            setAudioProgress(prev => ({ ...prev, [submissionId]: progress }));
+
+            // Stop timer when playback completes
+            if (progress >= 1) {
+              clearInterval(progressTimerRef.current[submissionId]);
+              delete progressTimerRef.current[submissionId];
+            }
+          });
+        }, 100);
+      });
+    } catch (error) {
+      console.error('Audio playback error:', error);
+      setAudioLoadingId(null);
+      setCurrentPlayingId(null);
+      Alert.alert(
+        'Audio Error',
+        'An error occurred while trying to play the audio.',
+      );
+    }
   };
 
   // Render submission item
@@ -206,6 +332,10 @@ const SubmissionsScreen: React.FC = () => {
 
     const wordText =
       submission.word?.word || submission.word?.english || 'Unknown Word';
+
+    const isCurrentlyPlaying = currentPlayingId === submission.id;
+    const isAudioLoading = audioLoadingId === submission.id;
+    const progress = audioProgress[submission.id] || 0;
 
     return (
       <Card key={submission.id} style={styles.submissionCard}>
@@ -257,23 +387,60 @@ const SubmissionsScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Audio Section */}
+          {/* Enhanced Audio Section */}
           {submission.audioUrl && (
-            <TouchableOpacity
-              style={styles.audioContainer}
-              onPress={() =>
-                handleAudioPlay(submission.audioUrl!, submission.id)
-              }
-            >
-              <IconButton
-                icon="play-circle"
-                size={24}
-                iconColor="#6366f1"
-                style={styles.audioIcon}
-              />
-              <Text style={styles.audioText}>Play Audio</Text>
-              <IconButton icon="volume-high" size={20} iconColor="#6366f1" />
-            </TouchableOpacity>
+            <View style={styles.audioContainer}>
+              <View style={styles.audioMainRow}>
+                <TouchableOpacity
+                  style={styles.audioPlayButton}
+                  onPress={() =>
+                    handleAudioPlay(submission.audioUrl!, submission.id)
+                  }
+                  disabled={isAudioLoading}
+                >
+                  {isAudioLoading ? (
+                    <ActivityIndicator size={20} color="#6366f1" />
+                  ) : (
+                    <IconButton
+                      icon={isCurrentlyPlaying ? 'pause' : 'play'}
+                      size={20}
+                      iconColor="#6366f1"
+                      style={styles.playIcon}
+                    />
+                  )}
+                  <Text style={styles.audioText}>
+                    {isAudioLoading
+                      ? 'Loading...'
+                      : isCurrentlyPlaying
+                      ? 'Playing'
+                      : 'Play Audio'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Audio indicator */}
+                <View style={styles.audioIndicator}>
+                  <IconButton
+                    icon="volume-high"
+                    size={16}
+                    iconColor={isCurrentlyPlaying ? '#6366f1' : '#999'}
+                  />
+                </View>
+              </View>
+
+              {/* Audio progress bar */}
+              {(isCurrentlyPlaying || progress > 0) && (
+                <View style={styles.progressContainer}>
+                  <ProgressBar
+                    progress={progress}
+                    color="#6366f1"
+                    style={styles.progressBar}
+                  />
+                  <Text style={styles.progressText}>
+                    {Math.round(progress * 100)}%
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
         </Card.Content>
       </Card>
@@ -335,27 +502,6 @@ const SubmissionsScreen: React.FC = () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-        onScroll={({ nativeEvent }) => {
-          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const paddingToBottom = 100; // Increase padding to trigger earlier but less frequently
-          const isCloseToBottom =
-            layoutMeasurement.height + contentOffset.y >=
-            contentSize.height - paddingToBottom;
-
-          // More strict conditions to prevent rapid firing
-          if (
-            isCloseToBottom &&
-            hasMoreData &&
-            !loading &&
-            !refreshing &&
-            !isLoadingMore &&
-            submissions.length > 0 // Only trigger if we have existing data
-          ) {
-            console.log('🔄 Loading more submissions...');
-            handleLoadMore();
-          }
-        }}
-        scrollEventThrottle={200}
         showsVerticalScrollIndicator={true}
       >
         {submissions && submissions.length === 0 && !loading ? (
@@ -378,10 +524,23 @@ const SubmissionsScreen: React.FC = () => {
           </View>
         )}
 
-        {loading && submissions.length > 0 && (
-          <View style={styles.paginationLoadingContainer}>
-            <ActivityIndicator size="small" />
-            <Text style={styles.paginationLoadingText}>Loading more...</Text>
+        {/* Load More Button */}
+        {hasMoreData && submissions && submissions.length > 0 && !loading && (
+          <View style={styles.loadMoreContainer}>
+            <TouchableOpacity
+              style={styles.loadMoreButton}
+              onPress={handleLoadMore}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? (
+                <View style={styles.loadMoreButtonContent}>
+                  <ActivityIndicator size="small" color="white" />
+                  <Text style={styles.loadMoreLoadingText}>Loading...</Text>
+                </View>
+              ) : (
+                <Text style={styles.loadMoreText}>Load More</Text>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
@@ -539,7 +698,7 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   audioContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column', // Changed to column for vertical layout
     alignItems: 'center',
     marginTop: 8,
     paddingVertical: 8,
@@ -549,7 +708,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e1f3d8',
   },
-  audioIcon: {
+  audioMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  audioPlayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  playIcon: {
     marginRight: 8,
   },
   audioText: {
@@ -557,6 +727,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#4f46e5',
     marginRight: 8,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  progressBar: {
+    flex: 1,
+    marginRight: 8,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  audioIndicator: {
+    marginLeft: 8,
   },
   emptyCard: {
     margin: 16,
@@ -606,6 +793,44 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
+  },
+  loadMoreContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  loadMoreButton: {
+    backgroundColor: '#6366f1',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadMoreButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreLoadingText: {
+    marginLeft: 8,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
