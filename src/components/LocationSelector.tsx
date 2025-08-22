@@ -302,15 +302,15 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   // }, [selectedDistrict, loadTehsils, onTehsilChange, onVillageChange]);
 
   // Update available villages when tehsil changes
-  useEffect(() => {
-    if (selectedTehsil) {
-      loadVillages(selectedTehsil.tehsilId);
-    } else {
-      setAvailableVillages([]);
-    }
-    // Reset village when tehsil changes
-    onVillageChange(null);
-  }, [selectedTehsil, loadVillages, onVillageChange]);
+  // useEffect(() => {
+  //   if (selectedTehsil) {
+  //     loadVillages(selectedTehsil.tehsilId);
+  //   } else {
+  //     setAvailableVillages([]);
+  //   }
+  //   // Reset village when tehsil changes
+  //   onVillageChange(null);
+  // }, [selectedTehsil, loadVillages, onVillageChange]);
 
   return (
     <Card style={styles.card}>
