@@ -14,7 +14,6 @@ import {
   Chip,
   Searchbar,
   FAB,
-  Badge,
   IconButton,
   ProgressBar,
 } from 'react-native-paper';
@@ -26,10 +25,12 @@ import { ApiSubmission, SubmissionFilterRequest } from '../types/api';
 import { MainTabParamList } from '../types';
 // Import Sound for audio playback
 import Sound from 'react-native-sound';
+import { API_CONFIG } from '../constants/apiConstants';
 
 type NavigationProp = BottomTabNavigationProp<MainTabParamList, 'Submissions'>;
 
 const SubmissionsScreen: React.FC = () => {
+  const BASE_URL = API_CONFIG.BASE_URL;
   const navigation = useNavigation<NavigationProp>();
   const { state } = useAppContext();
   const [submissions, setSubmissions] = useState<ApiSubmission[]>([]);
@@ -254,11 +255,9 @@ const SubmissionsScreen: React.FC = () => {
 
       setAudioLoadingId(submissionId);
       setCurrentPlayingId(null);
-
       // Create new sound instance
-      const sound = new Sound(audioUrl, '', error => {
+      const sound = new Sound(`${BASE_URL}${audioUrl}`, '', error => {
         setAudioLoadingId(null);
-
         if (error) {
           console.error('Failed to load sound:', error);
           Alert.alert(
@@ -397,7 +396,11 @@ const SubmissionsScreen: React.FC = () => {
                   disabled={isAudioLoading}
                 >
                   {isAudioLoading ? (
-                    <ActivityIndicator size={20} color="#6366f1" />
+                    <ActivityIndicator
+                      size={20}
+                      color="#6366f1"
+                      style={styles.loadingIcon}
+                    />
                   ) : (
                     <IconButton
                       icon={isCurrentlyPlaying ? 'pause' : 'play'}
@@ -424,20 +427,21 @@ const SubmissionsScreen: React.FC = () => {
                   />
                 </View>
               </View>
-
-              {/* Audio progress bar */}
-              {(isCurrentlyPlaying || progress > 0) && (
-                <View style={styles.progressContainer}>
-                  <ProgressBar
-                    progress={progress}
-                    color="#6366f1"
-                    style={styles.progressBar}
-                  />
-                  <Text style={styles.progressText}>
-                    {Math.round(progress * 100)}%
-                  </Text>
-                </View>
-              )}
+              <View style={styles.progressContainer}>
+                {/* Audio progress bar */}
+                {isCurrentlyPlaying && (
+                  <View style={styles.subProgressContainer}>
+                    <Text style={styles.progressText}>
+                      {Math.round(progress * 100)}%
+                    </Text>
+                    <ProgressBar
+                      progress={progress}
+                      color="#6366f1"
+                      style={styles.progressBar}
+                    />
+                  </View>
+                )}
+              </View>
             </View>
           )}
         </Card.Content>
@@ -698,9 +702,9 @@ const styles = StyleSheet.create({
   audioContainer: {
     flexDirection: 'column', // Changed to column for vertical layout
     alignItems: 'center',
-    // marginTop: 2,
-    // paddingVertical: 0,
-    // paddingHorizontal: 8,
+    // marginTop: 8,
+    // paddingVertical: 8,
+    // paddingHorizontal: 12,
     backgroundColor: '#e0dcf5', // Changed to a lighter blue that contrasts better
     borderRadius: 8,
     borderWidth: 1,
@@ -720,6 +724,9 @@ const styles = StyleSheet.create({
   playIcon: {
     marginRight: 8,
   },
+  loadingIcon: {
+    margin: 12,
+  },
   audioText: {
     fontSize: 14,
     fontWeight: '500',
@@ -727,14 +734,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 8,
+    width: '100%',
+  },
+  subProgressContainer: {
+    flexDirection: 'column',
+    gap: 4,
+    marginRight: 8,
+    marginLeft: 8,
   },
   progressBar: {
-    flex: 1,
-    marginRight: 8,
+    marginBlock: 8,
   },
   progressText: {
     fontSize: 12,
