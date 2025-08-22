@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,13 +14,9 @@ import {
   ProgressBar,
 } from 'react-native-paper';
 
-// 1. Import the library
-import AudioRecorderPlayer, {
-  AVEncoderAudioQualityIOSType,
-  AudioEncoderAndroidType,
-  AudioSourceAndroidType,
-  OutputFormatAndroidType,
-} from 'react-native-audio-recorder-player';
+// Import the new libraries
+import AudioRecord from 'react-native-audio-record';
+import Sound from 'react-native-sound';
 
 interface AudioRecorderProps {
   onRecordingComplete: (filePath: string, audioFile?: any) => void;
@@ -28,9 +24,6 @@ interface AudioRecorderProps {
   disabled?: boolean;
   existingRecording?: string;
 }
-
-// Correct way to use the library
-const audioRecorderPlayer = AudioRecorderPlayer;
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onRecordingComplete,
@@ -46,17 +39,57 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     string | null
   >(existingRecording || null);
   const [internalIsRecording, setInternalIsRecording] = useState(false);
+  const [sound, setSound] = useState<Sound | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    checkPermissions();
-    // 3. Add a cleanup function to stop recording/playback when component unmounts
-    return () => {
-      audioRecorderPlayer.stopRecorder();
-      audioRecorderPlayer.stopPlayer();
-      audioRecorderPlayer.removePlayBackListener();
-      audioRecorderPlayer.removeRecordBackListener();
+    const initializeComponent = async () => {
+      await checkPermissions();
+      initializeAudioRecord();
+
+      // Enable sound playback for local files
+      Sound.setCategory('Playback');
     };
-  }, []);
+
+    initializeComponent();
+
+    return () => {
+      // Cleanup
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+      AudioRecord.stop();
+    };
+  }, []); // Empty dependency array is fine here since we only want this to run once
+
+  // Separate useEffect for sound cleanup
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.release();
+      }
+    };
+  }, [sound]);
+
+  const initializeAudioRecord = () => {
+    try {
+      const options = {
+        sampleRate: 16000, // default 44100
+        channels: 1, // 1 or 2, default 1
+        bitsPerSample: 16, // 8 or 16, default 16
+        audioSource: 6, // android only (see below)
+        wavFile: 'audio.wav', // default 'audio.wav'
+      };
+
+      AudioRecord.init(options);
+      setIsInitialized(true);
+      console.log('✅ AudioRecord initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize AudioRecord:', error);
+      setIsInitialized(false);
+    }
+  };
 
   const checkPermissions = async () => {
     if (Platform.OS === 'android') {
@@ -72,12 +105,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           },
         );
         setHasPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
       } catch (err) {
         console.warn(err);
         setHasPermission(false);
+        return false;
       }
     } else {
       setHasPermission(true);
+      return true;
     }
   };
 
@@ -89,81 +125,113 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       .padStart(2, '0')}`;
   };
 
-  // 4. Update to use the library's recording methods
+  const startRecordingTimer = () => {
+    let seconds = 0;
+    const timer = setInterval(() => {
+      seconds += 1;
+      setRecordTime(formatTime(seconds));
+    }, 1000);
+    recordingTimerRef.current = timer;
+  };
+
+  const stopRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
   const onStartRecord = async () => {
     if (!hasPermission) {
       Alert.alert(
         'Permission Required',
         'Please grant microphone permission to record audio',
       );
-      await checkPermissions();
-      return;
+      const granted = await checkPermissions();
+      if (!granted) return;
+    }
+
+    if (!isInitialized) {
+      console.log(
+        '⚠️ AudioRecord not initialized, attempting to initialize...',
+      );
+      initializeAudioRecord();
+
+      // Wait a bit for initialization
+      await new Promise<void>(resolve => setTimeout(resolve, 100));
+
+      if (!isInitialized) {
+        Alert.alert(
+          'Initialization Error',
+          'Failed to initialize audio recording. Please try again.',
+        );
+        return;
+      }
     }
 
     try {
-      const path = Platform.select({
-        ios: 'hello.m4a', // Use a consistent filename
-        android: `${PermissionsAndroid.PERMISSIONS.RECORD_AUDIO.split(
-          '.',
-        ).pop()}_${Date.now()}.m4a`, // Dynamic filename
-      });
-
-      const audioSet = {
-        AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
-        AudioSourceAndroid: AudioSourceAndroidType.MIC,
-        AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
-        AVLinearPCMBitRateKey: 16,
-        AVNumberOfChannelsKey: 2,
-        AVSampleRateKey: 44100,
-        OutputFormatAndroid: OutputFormatAndroidType.MPEG_4,
-      };
-
-      const uri = await audioRecorderPlayer.startRecorder(path, audioSet);
-      audioRecorderPlayer.addRecordBackListener(e => {
-        const currentTime = audioRecorderPlayer.mmss(
-          Math.floor(e.currentPosition),
-        );
-        setRecordTime(currentTime);
-      });
-
+      console.log('🎤 Starting recording...');
+      AudioRecord.start();
       setInternalIsRecording(true);
-      setCurrentRecordingPath(uri);
-      console.log('🎤 Recording started. URI:', uri);
+      startRecordingTimer();
     } catch (error) {
       console.error('Start recording error:', error);
       setInternalIsRecording(false);
       Alert.alert(
         'Recording Error',
-        'Failed to start recording. Please try again.',
+        'Failed to start recording. Please ensure the app has microphone permissions and try again.',
       );
     }
   };
 
   const onStopRecord = async () => {
     try {
-      const result = await audioRecorderPlayer.stopRecorder();
-      audioRecorderPlayer.removeRecordBackListener();
-
+      console.log('🛑 Stopping recording...');
+      const audioFile = await AudioRecord.stop();
       setInternalIsRecording(false);
+      stopRecordingTimer();
 
-      // The library gives us the path and the file object is created internally.
-      // We can use the result directly in the parent component.
-      onRecordingComplete(result);
+      if (audioFile) {
+        setCurrentRecordingPath(audioFile);
+        onRecordingComplete(audioFile);
 
-      console.log('🛑 Recording stopped:', result);
-      Alert.alert(
-        'Recording Complete',
-        `Audio recorded successfully!\nFile Path: ${result}`,
-        [{ text: 'OK' }],
-      );
+        console.log('Recording saved:', audioFile);
+        Alert.alert(
+          'Recording Complete',
+          `Audio recorded successfully!\nFile saved: ${audioFile}`,
+          [{ text: 'OK' }],
+        );
+      }
     } catch (error) {
       console.error('Stop recording error:', error);
       setInternalIsRecording(false);
+      stopRecordingTimer();
       Alert.alert('Recording Error', 'Failed to stop recording properly.');
     }
   };
 
-  // 5. Update to use the library's playback methods
+  const startPlaybackTimer = (duration: number) => {
+    let seconds = 0;
+    const timer = setInterval(() => {
+      seconds += 1;
+      setPlayTime(formatTime(seconds));
+
+      if (seconds >= duration) {
+        clearInterval(timer);
+        setIsPlaying(false);
+        setPlayTime('00:00');
+      }
+    }, 1000);
+    playbackTimerRef.current = timer;
+  };
+
+  const stopPlaybackTimer = () => {
+    if (playbackTimerRef.current) {
+      clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    }
+  };
+
   const onStartPlay = async () => {
     if (!currentRecordingPath) {
       Alert.alert('No Recording', 'Please record audio first');
@@ -171,21 +239,40 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
 
     try {
-      setIsPlaying(true);
-      setPlayTime('00:00');
+      console.log('▶️ Starting playback:', currentRecordingPath);
 
-      await audioRecorderPlayer.startPlayer(currentRecordingPath);
-      audioRecorderPlayer.addPlayBackListener(e => {
-        if (e.currentPosition === e.duration) {
-          audioRecorderPlayer.stopPlayer();
+      // Release previous sound if exists
+      if (sound) {
+        sound.release();
+      }
+
+      const newSound = new Sound(currentRecordingPath, '', error => {
+        if (error) {
+          console.error('Failed to load sound:', error);
+          Alert.alert('Playback Error', 'Failed to load audio file');
+          return;
+        }
+
+        console.log(
+          'Sound loaded successfully, duration:',
+          newSound.getDuration(),
+        );
+        setSound(newSound);
+        setIsPlaying(true);
+
+        newSound.play(success => {
+          if (success) {
+            console.log('⏹️ Playback completed successfully');
+          } else {
+            console.log('⚠️ Playback failed due to audio decoding errors');
+          }
           setIsPlaying(false);
           setPlayTime('00:00');
-          audioRecorderPlayer.removePlayBackListener();
-        } else {
-          setPlayTime(audioRecorderPlayer.mmss(Math.floor(e.currentPosition)));
-        }
+          stopPlaybackTimer();
+        });
+
+        startPlaybackTimer(newSound.getDuration());
       });
-      console.log('▶️ Playback started');
     } catch (error) {
       console.error('Play error:', error);
       setIsPlaying(false);
@@ -195,11 +282,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   const onStopPlay = async () => {
     try {
-      await audioRecorderPlayer.stopPlayer();
-      audioRecorderPlayer.removePlayBackListener();
-      setIsPlaying(false);
-      setPlayTime('00:00');
-      console.log('⏹️ Playback stopped');
+      if (sound) {
+        sound.stop(() => {
+          console.log('⏹️ Playback stopped');
+          setIsPlaying(false);
+          setPlayTime('00:00');
+          stopPlaybackTimer();
+        });
+      }
     } catch (error) {
       console.error('Stop play error:', error);
     }
@@ -215,8 +305,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            // No need to delete the file, the library handles that.
-            // Just clear the state.
+            if (sound) {
+              sound.release();
+              setSound(null);
+            }
             setCurrentRecordingPath(null);
             setRecordTime('00:00');
             setPlayTime('00:00');
@@ -246,15 +338,18 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
             iconColor={currentlyRecording ? '#d32f2f' : '#1976d2'}
             containerColor={currentlyRecording ? '#ffebee' : '#e3f2fd'}
             onPress={currentlyRecording ? onStopRecord : onStartRecord}
-            disabled={disabled || !hasPermission}
+            disabled={disabled || !hasPermission || !isInitialized}
             style={[
               styles.recordButton,
               currentlyRecording ? styles.recordingButton : [],
-              disabled && styles.disabledButton,
+              (disabled || !hasPermission || !isInitialized) &&
+                styles.disabledButton,
             ]}
           />
           <Text style={styles.recordButtonText}>
-            {currentlyRecording
+            {!isInitialized
+              ? '⚙️ Initializing...'
+              : currentlyRecording
               ? '🔴 Recording... Tap to Stop'
               : 'Tap to Record'}
           </Text>
@@ -292,7 +387,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                 disabled={disabled}
                 style={styles.playButton}
               >
-                {isPlaying ? 'Pause' : 'Play Recording'}
+                {isPlaying ? 'Stop' : 'Play Recording'}
               </Button>
 
               <Button
@@ -328,7 +423,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         {/* Status Info */}
         <Text style={styles.statusText}>
           Status:{' '}
-          {currentlyRecording
+          {!isInitialized
+            ? '⚙️ Initializing audio system...'
+            : currentlyRecording
             ? '🔴 Recording'
             : currentRecordingPath
             ? '✅ Ready to play'
@@ -364,7 +461,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   recordingButton: {
-    transform: [],
+    // Remove the empty transform array as it's not needed
   },
   disabledButton: {
     opacity: 0.5,
