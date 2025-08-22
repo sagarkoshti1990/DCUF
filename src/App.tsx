@@ -8,7 +8,6 @@ import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import AppNavigator from './navigation/AppNavigator';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { apiService } from './services/apiService';
-import { httpClient } from './services/httpClient';
 
 const lightTheme = {
   ...MD3LightTheme,
@@ -50,11 +49,6 @@ function App(): React.JSX.Element {
     const initializeApp = async () => {
       try {
         console.log('🚀 Initializing DCUF App...');
-
-        // Set the auth token for testing
-        httpClient.setAuthToken(
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMWE0NGZmNS0yMjUwLTQ0NmYtOTA1NC01YThjN2RjYmM3NDkiLCJlbWFpbCI6InR1c2hhci5tYWhhamFuQHRla2RpdGVjaG5vbG9naWVzLmNvbSIsImlhdCI6MTc1NTc3MTA4NiwiZXhwIjoxNzU1ODU3NDg2fQ.h5K59KZDA1xtEaSKqqrOR3j-Qcna-scpR_lF_Y82vOs',
-        );
 
         // Initialize API service with configuration
         await apiService.initialize({

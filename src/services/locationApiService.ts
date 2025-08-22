@@ -276,7 +276,7 @@ export class LocationApiService {
       if (response.success && response.data) {
         return {
           success: true,
-          data: response.data.data.districts,
+          data: { districts: response.data.data.districts },
         };
       }
 

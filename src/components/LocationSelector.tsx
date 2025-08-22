@@ -151,7 +151,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     try {
       const response = await apiService.locations.getAllDistricts();
       if (response.success && response.data) {
-        const legacyDistricts = response.data;
+        const legacyDistricts = response.data.districts;
         setAvailableDistricts(legacyDistricts);
       } else {
         console.warn(
@@ -290,16 +290,16 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   }, [loadDistricts]);
 
   // Update available tehsils when district changes
-  useEffect(() => {
-    if (selectedDistrict) {
-      loadTehsils(selectedDistrict.districtId);
-    } else {
-      setAvailableTehsils([]);
-    }
-    // Reset tehsil and village when district changes
-    onTehsilChange(null);
-    onVillageChange(null);
-  }, [selectedDistrict, loadTehsils, onTehsilChange, onVillageChange]);
+  // useEffect(() => {
+  //   if (selectedDistrict) {
+  //     loadTehsils(selectedDistrict.districtId);
+  //   } else {
+  //     setAvailableTehsils([]);
+  //   }
+  //   // Reset tehsil and village when district changes
+  //   onTehsilChange(null);
+  //   onVillageChange(null);
+  // }, [selectedDistrict, loadTehsils, onTehsilChange, onVillageChange]);
 
   // Update available villages when tehsil changes
   useEffect(() => {
