@@ -36,6 +36,10 @@ const convertApiUserToLegacy = (
   apiUser: ApiUser,
   existingLoginTime?: string,
 ): User & { apiId?: string } => {
+  // Use a consistent loginTime to prevent object recreation
+  const loginTime =
+    existingLoginTime || apiUser.createdAt || new Date().toISOString();
+
   const legacyUser: User & { apiId?: string } = {
     userId: apiUser.id, // Use API id as userId
     email: apiUser.email,
@@ -47,7 +51,7 @@ const convertApiUserToLegacy = (
     updatedAt: apiUser.updatedAt,
     // Legacy compatibility fields
     id: apiUser.id, // For backward compatibility
-    loginTime: existingLoginTime || new Date().toISOString(), // Preserve existing loginTime to prevent re-renders
+    loginTime: loginTime, // Use stable loginTime to prevent re-renders
     apiId: apiUser.id, // Preserve original API ID for submissions
   };
 
@@ -64,6 +68,7 @@ const convertApiUserToLegacy = (
       fName: legacyUser.fName,
       lName: legacyUser.lName,
       apiId: legacyUser.apiId,
+      loginTime: legacyUser.loginTime,
     },
   });
 
@@ -130,6 +135,16 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, loading: action.payload };
 
     case ACTION_TYPES.SET_USER:
+      // Prevent unnecessary state updates if user data is the same
+      if (state.user && action.payload) {
+        const currentUserString = JSON.stringify(state.user);
+        const newUserString = JSON.stringify(action.payload);
+        if (currentUserString === newUserString) {
+          console.log('👤 User data is identical, skipping state update');
+          return state; // No change needed
+        }
+      }
+      console.log('👤 Setting new user state:', action.payload?.email);
       return {
         ...state,
         user: action.payload,
@@ -296,35 +311,53 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     try {
       dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
 
-      // Check if user is already authenticated via API
-      const isAuthenticated = await apiService.auth.isAuthenticated();
+      // Load stored user data first to prevent unnecessary API calls
+      const existingUserData = await AsyncStorage.getItem(
+        STORAGE_KEYS.USER_DATA,
+      );
+      let shouldCheckAuth = true;
 
-      if (isAuthenticated) {
-        const currentUserResponse = await apiService.auth.getCurrentUser();
-        if (currentUserResponse.success && currentUserResponse.data) {
-          // Check if we have existing user data to preserve loginTime
-          const existingUserData = await AsyncStorage.getItem(
-            STORAGE_KEYS.USER_DATA,
-          );
-          let existingLoginTime: string | undefined;
-
-          if (existingUserData) {
-            try {
-              const existingUser = JSON.parse(existingUserData) as User;
-              existingLoginTime = existingUser.loginTime;
-            } catch (e) {
-              // Ignore parse error
-            }
-          }
-
-          const legacyUser = convertApiUserToLegacy(
-            currentUserResponse.data.user,
-            existingLoginTime,
-          );
+      if (existingUserData) {
+        try {
+          const existingUser = JSON.parse(existingUserData) as User;
+          // Set existing user without API verification to prevent loops
           dispatch({
             type: ACTION_TYPES.SET_USER,
-            payload: legacyUser,
+            payload: existingUser,
           });
+          shouldCheckAuth = false; // Skip auth check if we have valid stored user
+        } catch (e) {
+          console.log('Failed to parse existing user data, will check auth');
+        }
+      }
+
+      // Only check authentication if no valid stored user found
+      if (shouldCheckAuth) {
+        const isAuthenticated = await apiService.auth.isAuthenticated();
+
+        if (isAuthenticated) {
+          const currentUserResponse = await apiService.auth.getCurrentUser();
+          if (currentUserResponse.success && currentUserResponse.data) {
+            let existingLoginTime: string | undefined;
+
+            if (existingUserData) {
+              try {
+                const existingUser = JSON.parse(existingUserData) as User;
+                existingLoginTime = existingUser.loginTime;
+              } catch (e) {
+                // Ignore parse error
+              }
+            }
+
+            const legacyUser = convertApiUserToLegacy(
+              currentUserResponse.data.user,
+              existingLoginTime,
+            );
+            dispatch({
+              type: ACTION_TYPES.SET_USER,
+              payload: legacyUser,
+            });
+          }
         }
       }
 
@@ -377,12 +410,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Network connectivity monitoring
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
+    const unsubscribe = NetInfo.addEventListener(netState => {
       dispatch({
         type: ACTION_TYPES.SET_NETWORK_STATUS,
         payload: {
-          isConnected: state.isConnected ?? false,
-          connectionType: state.type,
+          isConnected: netState.isConnected ?? false,
+          connectionType: netState.type,
         },
       });
     });

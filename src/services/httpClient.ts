@@ -116,10 +116,10 @@ export class HttpClient {
       }
 
       // Safe logging for React Native - convert objects to strings
-      console.log(
-        `[HTTP] Response ${response.status}:`,
-        JSON.stringify(data, null, 2),
-      );
+      // console.log(
+      //   `[HTTP] Response ${response.status}:`,
+      //   JSON.stringify(data, null, 2),
+      // );
 
       if (response.ok) {
         return {

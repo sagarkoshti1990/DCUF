@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  memo,
+  useRef,
+} from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Card, Title, Paragraph, useTheme, Text } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -14,6 +21,9 @@ const HomeScreen: React.FC = memo(() => {
   const navigation = useNavigation();
   const { state } = useAppContext();
 
+  // Ref to prevent multiple simultaneous loadStats calls
+  const loadingStatsRef = useRef(false);
+
   // State for statistics
   const [stats, setStats] = useState({
     totalSubmissions: 0,
@@ -26,9 +36,12 @@ const HomeScreen: React.FC = memo(() => {
   const userId = state.user?.id;
   const apiInitialized = state.apiInitialized;
   const offlineDataLength = state.offlineData.length;
+
+  // Create a stable userApiId that only changes when the actual user changes
   const userApiId = useMemo(() => {
-    return userId ? (state.user as any).apiId || userId.toString() : null;
-  }, [userId, state.user]);
+    if (!state.user) return null;
+    return (state.user as any).apiId || state.user.userId?.toString() || null;
+  }, [state.user]); // Include state.user for linter
 
   console.log('🔄 HomeScreen deps changed:', {
     userId,
@@ -95,7 +108,15 @@ const HomeScreen: React.FC = memo(() => {
     console.log('📊 loadStats called', {
       userApiId,
       apiInitialized,
+      isAlreadyLoading: loadingStatsRef.current,
     });
+
+    // Prevent multiple simultaneous calls
+    if (loadingStatsRef.current) {
+      console.log('📊 Already loading stats, skipping...');
+      return;
+    }
+
     if (!userApiId || !apiInitialized) {
       console.log('📊 Skipping loadStats - missing requirements');
       setStats(prev => ({ ...prev, loading: false }));
@@ -103,6 +124,7 @@ const HomeScreen: React.FC = memo(() => {
     }
 
     try {
+      loadingStatsRef.current = true;
       setStats(prev => ({ ...prev, loading: true }));
 
       if (userApiId) {
@@ -195,8 +217,10 @@ const HomeScreen: React.FC = memo(() => {
         completedToday: 0,
         loading: false,
       });
+    } finally {
+      loadingStatsRef.current = false;
     }
-  }, [userApiId, apiInitialized, offlineDataLength]);
+  }, [userApiId, apiInitialized, offlineDataLength]); // Include offlineDataLength for linter compliance
 
   // Load stats when component mounts and when screen is focused
   useEffect(() => {

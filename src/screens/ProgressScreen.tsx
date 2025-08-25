@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import {
   Card,
@@ -25,6 +31,9 @@ const ProgressScreen: React.FC = () => {
   const theme = useTheme();
   const { state } = useAppContext();
 
+  // Ref to prevent multiple simultaneous loadProgressData calls
+  const loadingProgressRef = useRef(false);
+
   const [stats, setStats] = useState<ProgressStats>({
     totalSubmissions: 0,
     approvedSubmissions: 0,
@@ -35,21 +44,32 @@ const ProgressScreen: React.FC = () => {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Create stable user identifier to prevent unnecessary re-renders
+  const userApiId = useMemo(() => {
+    if (!state.user) return null;
+    return (state.user as any).apiId || state.user.userId?.toString() || null;
+  }, [state.user]); // Include state.user for linter compliance
+
   const loadProgressData = useCallback(async () => {
+    // Prevent multiple simultaneous calls
+    if (loadingProgressRef.current) {
+      console.log('📊 Already loading progress data, skipping...');
+      return;
+    }
+
+    if (!userApiId) {
+      console.log('📊 No user API ID, skipping progress data load');
+      setStats(prev => ({ ...prev, loading: false }));
+      return;
+    }
+
     try {
+      loadingProgressRef.current = true;
       setStats(prev => ({ ...prev, loading: true }));
 
-      const userApiId =
-        (state.user as any).apiId || state.user?.userId?.toString();
-
-      if (userApiId) {
-        // Get total counts for different statuses in parallel
-        const [
-          pendingResponse,
-          approvedResponse,
-          rejectedResponse,
-          allResponse,
-        ] = await Promise.all([
+      // Get total counts for different statuses in parallel
+      const [pendingResponse, approvedResponse, rejectedResponse, allResponse] =
+        await Promise.all([
           apiService.submissions.getSubmissionsWithFilters({
             page: 1,
             limit: 1,
@@ -83,21 +103,20 @@ const ProgressScreen: React.FC = () => {
           }),
         ]);
 
-        setStats({
-          totalSubmissions: allResponse.data?.pagination?.total || 0,
-          approvedSubmissions: approvedResponse.data?.pagination?.total || 0,
-          pendingSubmissions: pendingResponse.data?.pagination?.total || 0,
-          rejectedSubmissions: rejectedResponse.data?.pagination?.total || 0,
-          loading: false,
-        });
-      } else {
-        setStats(prev => ({ ...prev, loading: false }));
-      }
+      setStats({
+        totalSubmissions: allResponse.data?.pagination?.total || 0,
+        approvedSubmissions: approvedResponse.data?.pagination?.total || 0,
+        pendingSubmissions: pendingResponse.data?.pagination?.total || 0,
+        rejectedSubmissions: rejectedResponse.data?.pagination?.total || 0,
+        loading: false,
+      });
     } catch (error) {
       console.error('Error loading progress data:', error);
       setStats(prev => ({ ...prev, loading: false }));
+    } finally {
+      loadingProgressRef.current = false;
     }
-  }, []);
+  }, [userApiId]);
 
   useEffect(() => {
     loadProgressData();
