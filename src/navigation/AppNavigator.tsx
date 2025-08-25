@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { useTheme } from 'react-native-paper';
 import { authService } from '../services/authService';
 import { useAppContext } from '../context/AppContext';
 import { RootStackParamList, MainTabParamList } from '../types';
@@ -42,58 +43,74 @@ const getTabBarIcon = (
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const MainTabs: React.FC = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ focused, color, size }) =>
-        getTabBarIcon(route.name, focused, color, size),
-      tabBarActiveTintColor: 'tomato',
-      tabBarInactiveTintColor: 'gray',
-      // Prevent screens from mounting until they're focused
-      lazy: true,
-    })}
-  >
-    <Tab.Screen
-      name="Home"
-      component={HomeScreen}
-      options={{
-        title: 'Home',
-      }}
-    />
-    <Tab.Screen
-      name="DataEntry"
-      component={DataEntryScreen}
-      options={{
-        title: 'Data Collection',
-      }}
-    />
-    <Tab.Screen
-      name="Submissions"
-      component={SubmissionsScreen}
-      options={{
-        title: 'Submissions',
-      }}
-    />
-    <Tab.Screen
-      name="Progress"
-      component={ProgressScreen}
-      options={{
-        title: 'Progress',
-      }}
-    />
-    <Tab.Screen
-      name="Settings"
-      component={SettingsScreen}
-      options={{
-        title: 'Settings',
-      }}
-    />
-  </Tab.Navigator>
-);
+const MainTabs: React.FC = () => {
+  const theme = useTheme();
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) =>
+          getTabBarIcon(route.name, focused, color, size),
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.outline,
+        },
+        headerStyle: {
+          backgroundColor: theme.colors.surface,
+        },
+        headerTintColor: theme.colors.onSurface,
+        headerTitleStyle: {
+          color: theme.colors.onSurface,
+        },
+        // Prevent screens from mounting until they're focused
+        lazy: true,
+      })}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          title: 'Home',
+        }}
+      />
+      <Tab.Screen
+        name="DataEntry"
+        component={DataEntryScreen}
+        options={{
+          title: 'Data Collection',
+        }}
+      />
+      <Tab.Screen
+        name="Submissions"
+        component={SubmissionsScreen}
+        options={{
+          title: 'Submissions',
+        }}
+      />
+      <Tab.Screen
+        name="Progress"
+        component={ProgressScreen}
+        options={{
+          title: 'Progress',
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          title: 'Settings',
+        }}
+      />
+    </Tab.Navigator>
+  );
+};
 
 const AppNavigator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { state, actions } = useAppContext();
+  const theme = useTheme();
 
   const checkAuthState = useCallback(async () => {
     try {
@@ -117,8 +134,13 @@ const AppNavigator: React.FC = () => {
 
   if (isLoading || state.loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200ea" />
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -141,7 +163,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
 });
 
