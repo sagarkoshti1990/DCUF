@@ -351,12 +351,12 @@ const SubmissionsScreen: React.FC = () => {
     const wordText =
       submission.word?.word || submission.word?.english || 'Unknown Word';
 
-    const isCurrentlyPlaying = currentPlayingId === submission.id;
-    const isAudioLoading = audioLoadingId === submission.id;
-    const progress = audioProgress[submission.id] || 0;
+    const isCurrentlyPlaying = currentPlayingId === submission.submissionId;
+    const isAudioLoading = audioLoadingId === submission.submissionId;
+    const progress = audioProgress[submission.submissionId || ''] || 0;
 
     return (
-      <Card key={submission.id} style={styles.submissionCard}>
+      <Card key={submission.submissionId} style={styles.submissionCard}>
         <Card.Content style={styles.cardContent}>
           {/* Header with word and status */}
           <View style={styles.cardHeader}>
@@ -410,7 +410,10 @@ const SubmissionsScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.audioPlayButton}
                   onPress={() =>
-                    handleAudioPlay(submission.audioUrl!, submission.id)
+                    handleAudioPlay(
+                      submission.audioUrl!,
+                      submission.submissionId || '',
+                    )
                   }
                   disabled={isAudioLoading}
                 >
