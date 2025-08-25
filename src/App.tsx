@@ -55,17 +55,8 @@ function App(): React.JSX.Element {
           baseUrl: 'https://rlapi.tekdinext.com',
         });
 
-        // Test the new words API
-        console.log('🧪 Testing new words API...');
-        const testResult = await apiService.testWordsAPI();
-        if (testResult.success) {
-          console.log(
-            '✅ Words API test successful! Words count:',
-            testResult.data?.length || 0,
-          );
-        } else {
-          console.log('⚠️ Words API test failed:', testResult.error);
-        }
+        // Note: Word API tests are now handled when user is authenticated
+        console.log('📝 Word API will be initialized after authentication');
 
         console.log('✅ App initialization complete');
       } catch (error) {

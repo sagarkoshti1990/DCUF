@@ -17,7 +17,7 @@ import {
   IconButton,
   ProgressBar,
 } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAppContext } from '../context/AppContext';
 import { apiService } from '../services/apiService';
@@ -32,7 +32,7 @@ type NavigationProp = BottomTabNavigationProp<MainTabParamList, 'Submissions'>;
 const SubmissionsScreen: React.FC = () => {
   const BASE_URL = API_CONFIG.BASE_URL;
   const navigation = useNavigation<NavigationProp>();
-  const { state } = useAppContext();
+  const { state, actions } = useAppContext();
   const [submissions, setSubmissions] = useState<ApiSubmission[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -150,11 +150,26 @@ const SubmissionsScreen: React.FC = () => {
         );
 
         if (response.success && response.data) {
-          console.log('🔍 Response:', response);
-          const newSubmissions = response.data.items;
+          const newSubmissions = response.data.submissions;
 
           if (isRefresh || pageNum === 1) {
             setSubmissions(newSubmissions);
+            // Update global state when refreshing or loading first page
+            console.log('🌍 Updating global submissions state');
+            // Convert ApiSubmission to Submission format for global state
+            const globalSubmissions = newSubmissions.map((apiSub: any) => ({
+              submissionId: apiSub.id,
+              wordId: apiSub.word?.id || apiSub.wordId,
+              synonyms: apiSub.synonyms,
+              audioUrl: apiSub.audioUrl,
+              villageId: apiSub.village?.id || apiSub.villageId,
+              tehsilId: apiSub.tehsil?.id || apiSub.tehsilId,
+              districtId: apiSub.district?.id || apiSub.districtId,
+              languageId: apiSub.language?.id || apiSub.languageId,
+              createdAt: apiSub.createdAt,
+              updatedAt: apiSub.updatedAt,
+            }));
+            actions.setSubmissions(globalSubmissions);
           } else {
             setSubmissions(prev => [...prev, ...newSubmissions]);
           }
@@ -162,12 +177,6 @@ const SubmissionsScreen: React.FC = () => {
           setTotalCount(response.data.totalItems);
           setHasMoreData(response.data.hasNextPage);
           setPage(pageNum);
-
-          console.log('✅ Loaded submissions:', {
-            count: newSubmissions?.length,
-            total: response.data.totalItems,
-            hasMore: response.data.hasNextPage,
-          });
         } else {
           console.error('❌ Failed to load submissions:', response.error);
         }
@@ -197,6 +206,16 @@ const SubmissionsScreen: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus]);
+
+  // Refresh submissions when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (apiInitialized && userApiId) {
+        loadSubmissions(1, true, filterStatus);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [apiInitialized, userApiId, filterStatus]),
+  );
 
   // Refresh handler
   const handleRefresh = () => {
@@ -380,7 +399,7 @@ const SubmissionsScreen: React.FC = () => {
               </Text>
             </View>
             <Text style={styles.dateText}>
-              {new Date(submission.createdAt).toLocaleDateString()}
+              {new Date(submission.createdAt).toLocaleDateString('en-GB')}
             </Text>
           </View>
 

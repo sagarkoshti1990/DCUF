@@ -85,10 +85,12 @@ export class AuthApiService {
 
         return response;
       } else {
-        console.error('❌ Login failed:', response.error);
+        // Safe error logging and handling
+        const errorMessage = response.error || 'Login failed';
+        console.error('❌ Login failed:', errorMessage);
         return {
           success: false,
-          error: response.error || 'Login failed',
+          error: errorMessage,
         };
       }
     } catch (error: any) {

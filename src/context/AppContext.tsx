@@ -567,12 +567,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           dispatch({ type: ACTION_TYPES.SET_API_INITIALIZED, payload: true });
           return { success: true };
         } else {
-          console.error('❌ API login failed:', response.error);
+          // Safe error handling - ensure error is always a string
+          const errorMessage = response.error || 'Login failed';
+          console.error('❌ API login failed:', errorMessage);
           dispatch({
             type: ACTION_TYPES.SET_API_ERROR,
-            payload: response.error || 'Login failed',
+            payload: errorMessage,
           });
-          return { success: false, error: response.error || 'Login failed' };
+          return { success: false, error: errorMessage };
         }
       } catch (error) {
         console.error('💥 Login error:', error);

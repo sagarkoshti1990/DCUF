@@ -234,27 +234,71 @@ export class SubmissionApiService {
         // Transform the API response structure to match our expected format
         const apiData = response.data.data;
         const transformedData: PaginatedResponse<ApiSubmission> = {
-          items: apiData.submissions.map((submission: any) => ({
-            ...submission,
-            id: submission.submissionId, // Map submissionId to id
-          })),
-          totalItems: apiData.pagination?.total || apiData.submissions.length,
-          currentPage: apiData.pagination?.page || 1,
-          totalPages: apiData.pagination?.totalPages || 1,
-          hasNextPage: apiData.pagination?.hasNext || false,
-          hasPrevPage: apiData.pagination?.hasPrevious || false,
+          items: apiData.submissions,
+          ...apiData.pagination,
         };
 
         console.log('✅ Submissions fetched successfully:', transformedData);
         return {
           success: true,
-          data: transformedData,
+          data: apiData,
         };
       } else {
         console.error(
           '❌ Failed to fetch submissions:',
           response.error || 'Invalid response structure',
+          response,
         );
+
+        // Try alternative response structures
+        if (response.success && response.data) {
+          console.log('🔍 Trying alternative response structures...');
+
+          // Check if submissions are directly in data
+          if (response.data.submissions) {
+            console.log('✅ Found submissions at response.data.submissions');
+            const transformedData: PaginatedResponse<ApiSubmission> = {
+              items: response.data.submissions.map((submission: any) => ({
+                ...submission,
+                id: submission.submissionId || submission.id,
+              })),
+              totalItems:
+                response.data.pagination?.total ||
+                response.data.submissions.length,
+              currentPage: response.data.pagination?.page || 1,
+              totalPages: response.data.pagination?.totalPages || 1,
+              hasNextPage: response.data.pagination?.hasNext || false,
+              hasPrevPage: response.data.pagination?.hasPrevious || false,
+            };
+
+            return {
+              success: true,
+              data: transformedData,
+            };
+          }
+
+          // Check if data itself is an array of submissions
+          if (Array.isArray(response.data)) {
+            console.log('✅ Found submissions as direct array');
+            const transformedData: PaginatedResponse<ApiSubmission> = {
+              items: response.data.map((submission: any) => ({
+                ...submission,
+                id: submission.submissionId || submission.id,
+              })),
+              totalItems: response.data.length,
+              currentPage: 1,
+              totalPages: 1,
+              hasNextPage: false,
+              hasPrevPage: false,
+            };
+
+            return {
+              success: true,
+              data: transformedData,
+            };
+          }
+        }
+
         return {
           success: false,
           error: response.error || 'Invalid response structure',

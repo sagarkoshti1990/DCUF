@@ -17,35 +17,84 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState('');
   const { actions, state } = useAppContext();
 
+  // Clear errors when user starts typing
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    if (localError || state.apiError) {
+      setLocalError('');
+      actions.setApiError(null);
+    }
+  };
+
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    if (localError || state.apiError) {
+      setLocalError('');
+      actions.setApiError(null);
+    }
+  };
+
   const handleEmailPasswordLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+    // Clear any existing errors
+    setLocalError('');
+    actions.setApiError(null);
+
+    // Validate input
+    if (!email.trim()) {
+      setLocalError('Please enter your email address');
+      return;
+    }
+
+    if (!password.trim()) {
+      setLocalError('Please enter your password');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setLocalError('Please enter a valid email address');
       return;
     }
 
     setLoading(true);
     try {
       // Use API authentication
-      const response = await actions.loginWithAPI(email, password);
+      const response = await actions.loginWithAPI(email.trim(), password);
 
       if (response.success) {
         console.log('✅ Login successful');
-        // Don't call any unauthorized APIs here - let the app initialize after login
+        // Clear any errors on successful login
+        setLocalError('');
+        actions.setApiError(null);
       } else {
-        Alert.alert('Login Failed', response.error || 'Invalid credentials');
+        // Set user-friendly error messages
+        const errorMessage = response.error || 'Invalid credentials';
+        if (
+          errorMessage.toLowerCase().includes('unauthorized') ||
+          errorMessage.toLowerCase().includes('invalid credentials')
+        ) {
+          setLocalError(
+            'Invalid email or password. Please check your credentials and try again.',
+          );
+        } else if (errorMessage.toLowerCase().includes('network')) {
+          setLocalError(
+            'Network error. Please check your internet connection and try again.',
+          );
+        } else {
+          setLocalError(errorMessage);
+        }
       }
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Login Failed', 'An error occurred during login');
+      setLocalError('Unable to connect to the server. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
-
-  // Use API error if available, otherwise local error
-  const displayError = state.apiError;
 
   return (
     <View style={styles.container}>
@@ -59,7 +108,7 @@ const LoginScreen: React.FC = () => {
           <TextInput
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={handleEmailChange}
             mode="outlined"
             style={styles.input}
             autoCapitalize="none"
@@ -67,12 +116,13 @@ const LoginScreen: React.FC = () => {
             left={<TextInput.Icon icon="email" />}
             disabled={loading}
             placeholder="your.email@example.com"
+            error={!!(localError || state.apiError)}
           />
 
           <TextInput
             label="Password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
             mode="outlined"
             style={styles.input}
             secureTextEntry={!showPassword}
@@ -85,13 +135,14 @@ const LoginScreen: React.FC = () => {
             }
             disabled={loading}
             placeholder="Your password"
+            error={!!(localError || state.apiError)}
           />
 
-          {displayError ? (
-            <HelperText type="error" visible={!!displayError}>
-              {displayError}
+          {(localError || state.apiError) && (
+            <HelperText type="error" visible={true} style={styles.errorText}>
+              {localError || state.apiError}
             </HelperText>
-          ) : null}
+          )}
 
           <Button
             mode="contained"
@@ -142,6 +193,10 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 16,
     height: 48, // Fixed height instead of using contentStyle
+  },
+  errorText: {
+    marginTop: 4,
+    marginBottom: 8,
   },
 });
 

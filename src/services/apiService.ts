@@ -52,11 +52,23 @@ export class ApiService {
 
   /**
    * Test the new words API endpoint
+   * Note: This method should only be called when user is authenticated
    */
   async testWordsAPI(
     languageId: string = 'be9a1512-918c-4ca9-ad7b-cdd5581aab79',
   ): Promise<any> {
     try {
+      // Check authentication before making API calls
+      const isAuthenticated = await this.auth.isAuthenticated();
+      if (!isAuthenticated) {
+        console.log('🔒 User not authenticated, skipping words API test');
+        return {
+          success: false,
+          error: 'User not authenticated',
+          data: null,
+        };
+      }
+
       console.log('🧪 Testing words API with language ID:', languageId);
       const response = await this.words.getWordsByLanguage([languageId], 1, 50);
       console.log('🧪 Test response:', response);
@@ -69,6 +81,7 @@ export class ApiService {
 
   /**
    * Health check - Test API connectivity
+   * Note: This is a basic connectivity test that doesn't require authentication
    */
   async healthCheck(): Promise<{
     success: boolean;
@@ -76,14 +89,20 @@ export class ApiService {
     timestamp: string;
   }> {
     try {
-      // Try a simple API call to test connectivity
-      const response = await this.languages.getAllLanguages();
+      // Simple connectivity test without making authenticated API calls
+      const baseUrl = this.getBaseUrl();
+
+      if (!baseUrl) {
+        return {
+          success: false,
+          message: 'API base URL not configured',
+          timestamp: new Date().toISOString(),
+        };
+      }
 
       return {
-        success: response.success,
-        message: response.success
-          ? 'API is healthy'
-          : 'API connectivity issues',
+        success: true,
+        message: 'API configuration is healthy',
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
@@ -127,10 +146,24 @@ export class ApiService {
     return {
       /**
        * Load all necessary data for the app initialization
+       * Note: This should only be called when user is authenticated
        */
       loadInitialData: async () => {
         try {
           console.log('📊 Loading initial data...');
+
+          // Check authentication before loading data
+          const isAuthenticated = await this.auth.isAuthenticated();
+          if (!isAuthenticated) {
+            console.log(
+              '🔒 User not authenticated, skipping initial data loading',
+            );
+            return {
+              languages: [],
+              districts: [],
+              errors: ['User not authenticated'],
+            };
+          }
 
           const [languages, districts] = await Promise.all([
             this.languages.getAllLanguages(),

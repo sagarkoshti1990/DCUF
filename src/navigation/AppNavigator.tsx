@@ -13,6 +13,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import DataEntryScreen from '../screens/DataEntryScreen';
 import SubmissionsScreen from '../screens/SubmissionsScreen';
+import ProgressScreen from '../screens/ProgressScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const getTabBarIcon = (
@@ -27,10 +28,12 @@ const getTabBarIcon = (
     iconName = focused ? 'home' : 'home-outline';
   } else if (routeName === 'DataEntry') {
     iconName = focused ? 'add-circle' : 'add-circle-outline';
-  } else if (routeName === 'Settings') {
-    iconName = focused ? 'settings' : 'settings-outline';
   } else if (routeName === 'Submissions') {
     iconName = focused ? 'list' : 'list-outline';
+  } else if (routeName === 'Progress') {
+    iconName = focused ? 'stats-chart' : 'stats-chart-outline';
+  } else if (routeName === 'Settings') {
+    iconName = focused ? 'settings' : 'settings-outline';
   }
 
   return <Ionicons name={iconName} size={size} color={color} />;
@@ -46,6 +49,8 @@ const MainTabs: React.FC = () => (
         getTabBarIcon(route.name, focused, color, size),
       tabBarActiveTintColor: 'tomato',
       tabBarInactiveTintColor: 'gray',
+      // Prevent screens from mounting until they're focused
+      lazy: true,
     })}
   >
     <Tab.Screen
@@ -67,6 +72,13 @@ const MainTabs: React.FC = () => (
       component={SubmissionsScreen}
       options={{
         title: 'Submissions',
+      }}
+    />
+    <Tab.Screen
+      name="Progress"
+      component={ProgressScreen}
+      options={{
+        title: 'Progress',
       }}
     />
     <Tab.Screen

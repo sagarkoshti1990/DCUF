@@ -93,6 +93,17 @@ export class HttpClient {
         body: options.body,
       });
 
+      // Log authentication status for debugging
+      const authHeader = (config.headers as Record<string, string>)
+        ?.Authorization;
+      console.log('🔐 Auth status:', {
+        hasAuthHeader: !!authHeader,
+        authHeaderPrefix: authHeader
+          ? authHeader.substring(0, 20) + '...'
+          : 'None',
+        baseURL: this.baseURL,
+      });
+
       const response = await fetch(fullUrl, config);
       const responseText = await response.text();
 
@@ -104,7 +115,11 @@ export class HttpClient {
         data = { message: responseText };
       }
 
-      console.log(`[HTTP] Response ${response.status}:`, data);
+      // Safe logging for React Native - convert objects to strings
+      console.log(
+        `[HTTP] Response ${response.status}:`,
+        JSON.stringify(data, null, 2),
+      );
 
       if (response.ok) {
         return {
@@ -120,9 +135,29 @@ export class HttpClient {
           // You might want to redirect to login here
         }
 
+        // Safely extract error message from various possible formats
+        let errorMessage = `HTTP ${response.status}`;
+
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data && typeof data === 'object') {
+          // Handle different error response formats
+          if (data.message) {
+            errorMessage = data.message;
+          } else if (data.error) {
+            // Handle cases where error might be a string or object
+            errorMessage =
+              typeof data.error === 'string'
+                ? data.error
+                : data.error.message || 'An error occurred';
+          } else if (data.details) {
+            errorMessage = data.details;
+          }
+        }
+
         return {
           success: false,
-          error: data.message || data.error || `HTTP ${response.status}`,
+          error: errorMessage,
           errors: data.errors,
         };
       }

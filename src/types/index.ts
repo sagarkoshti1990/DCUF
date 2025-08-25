@@ -113,6 +113,7 @@ export type MainTabParamList = {
   Home: undefined;
   DataEntry: undefined;
   Submissions: undefined;
+  Progress: undefined;
   Settings: undefined;
 };
 
