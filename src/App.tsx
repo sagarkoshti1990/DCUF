@@ -48,7 +48,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('🚀 Initializing DCUF App...');
+        console.log('🚀 Initializing RISE App...');
 
         // Initialize API service with configuration
         await apiService.initialize({

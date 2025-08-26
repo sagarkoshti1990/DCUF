@@ -89,7 +89,7 @@
 ### Project Folder Structure ✅ **IMPLEMENTED**
 
 ```
-dcuf/
+rise/
 ├── src/
 │   ├── screens/               # App screens ✅
 │   │   ├── LoginScreen.tsx           ✅ COMPLETED

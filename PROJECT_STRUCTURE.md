@@ -1,11 +1,11 @@
-# DCUF Project Structure
+# RISE Project Structure
 
 This React Native project has been organized with a clean, scalable folder structure.
 
 ## 📁 Complete Folder Structure
 
 ```
-dcuf/
+rise/
 ├── android/                    # Native Android files
 ├── ios/                       # Native iOS files
 ├── src/                       # Your application source code

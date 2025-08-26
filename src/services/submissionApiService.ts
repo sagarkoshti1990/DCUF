@@ -233,12 +233,6 @@ export class SubmissionApiService {
       if (response.success && response.data?.data?.submissions) {
         // Transform the API response structure to match our expected format
         const apiData = response.data.data;
-        const transformedData: PaginatedResponse<ApiSubmission> = {
-          items: apiData.submissions,
-          ...apiData.pagination,
-        };
-
-        console.log('✅ Submissions fetched successfully:', transformedData);
         return {
           success: true,
           data: apiData,

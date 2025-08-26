@@ -77,9 +77,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.dcuf"
+    namespace "com.rise"
     defaultConfig {
-        applicationId "com.dcuf"
+        applicationId "com.rise"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -93,16 +93,16 @@ android {
             keyPassword 'android'
         }
         release {
-            if (project.hasProperty('DCUF_UPLOAD_STORE_FILE')) {
-                storeFile file(DCUF_UPLOAD_STORE_FILE)
-                storePassword DCUF_UPLOAD_STORE_PASSWORD
-                keyAlias DCUF_UPLOAD_KEY_ALIAS
-                keyPassword DCUF_UPLOAD_KEY_PASSWORD
+            if (project.hasProperty('RISE_UPLOAD_STORE_FILE')) {
+                storeFile file(RISE_UPLOAD_STORE_FILE)
+                storePassword RISE_UPLOAD_STORE_PASSWORD
+                keyAlias RISE_UPLOAD_KEY_ALIAS
+                keyPassword RISE_UPLOAD_KEY_PASSWORD
             } else {
-                storeFile file('dcuf-release-key.keystore')
-                storePassword 'dcuf2024'
-                keyAlias 'dcuf-key-alias'
-                keyPassword 'dcuf2024'
+                storeFile file('rise-release-key.keystore')
+                storePassword 'rise2024'
+                keyAlias 'rise-key-alias'
+                keyPassword 'rise2024'
             }
         }
     }

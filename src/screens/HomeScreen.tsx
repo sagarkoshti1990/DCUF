@@ -33,22 +33,19 @@ const HomeScreen: React.FC = memo(() => {
   });
 
   // Extract stable values to prevent re-render loops
-  const userId = state.user?.id;
   const apiInitialized = state.apiInitialized;
   const offlineDataLength = state.offlineData.length;
 
   // Create a stable userApiId that only changes when the actual user changes
   const userApiId = useMemo(() => {
     if (!state.user) return null;
-    return (state.user as any).apiId || state.user.userId?.toString() || null;
+    return (
+      (state.user as any).id ||
+      (state.user as any).apiId ||
+      state.user.userId?.toString() ||
+      null
+    );
   }, [state.user]); // Include state.user for linter
-
-  console.log('🔄 HomeScreen deps changed:', {
-    userId,
-    apiInitialized,
-    offlineDataLength,
-    userApiId,
-  });
 
   // Memoize card data to prevent recreation on every render
   const cardData = useMemo(
@@ -105,12 +102,6 @@ const HomeScreen: React.FC = memo(() => {
 
   // Load submission statistics - optimized to prevent re-render loops
   const loadStats = useCallback(async () => {
-    console.log('📊 loadStats called', {
-      userApiId,
-      apiInitialized,
-      isAlreadyLoading: loadingStatsRef.current,
-    });
-
     // Prevent multiple simultaneous calls
     if (loadingStatsRef.current) {
       console.log('📊 Already loading stats, skipping...');
@@ -244,7 +235,7 @@ const HomeScreen: React.FC = memo(() => {
   }, [loadStats]);
 
   useFocusEffect(focusEffectCallback);
-
+  console.log('stats sagar 1', stats);
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
@@ -253,7 +244,7 @@ const HomeScreen: React.FC = memo(() => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.colors.onBackground }]}>
-            Welcome to DCUF
+            Welcome to RISE
           </Text>
           <Text
             style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}

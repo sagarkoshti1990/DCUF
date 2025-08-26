@@ -1,5 +1,5 @@
 {
-  "name": "dcuf",
+  "name": "rise",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -8,8 +8,9 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "build-android": "cd android && ./gradlew assembleRelease -Pversion=1.0.0 && cp ./app/build/outputs/apk/release/app-release.apk ./dcuf.apk",
-    "build-android-bundle": "cd android && ./gradlew bundleRelease -Pversion=1.0.0 && cp ./app/build/outputs/bundle/release/app-release.aab ./dcuf.aab"
+    "clear-android": "cd android && ./gradlew clean",
+    "build-android": "cd android && ./gradlew assembleRelease -Pversion=1.0.0 && cp ./app/build/outputs/apk/release/app-release.apk ./RiSE.apk",
+    "build-android-bundle": "cd android && ./gradlew bundleRelease -Pversion=1.0.0 && cp ./app/build/outputs/bundle/release/app-release.aab ./RiSE.aab"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

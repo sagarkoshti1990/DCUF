@@ -3,7 +3,7 @@
  */
 
 // Base API URL - update this with your actual API endpoint
-export const BASE_URL = 'https://api.dcuf.com';
+export const BASE_URL = 'https://api.rise.com';
 
 // API Endpoints
 export const API_ENDPOINTS = {
@@ -27,7 +27,7 @@ export const API_ENDPOINTS = {
 
 // App Configuration
 export const APP_CONFIG = {
-  APP_NAME: 'DCUF',
+  APP_NAME: 'RISE',
   VERSION: '1.0.0',
   TIMEOUT: 30000, // 30 seconds
   RETRY_ATTEMPTS: 3,
@@ -59,8 +59,8 @@ export const FORM_CATEGORIES = [
 
 // Storage Keys
 export const STORAGE_KEYS = {
-  USER_TOKEN: '@dcuf_user_token',
-  USER_DATA: '@dcuf_user_data',
-  SETTINGS: '@dcuf_settings',
-  OFFLINE_DATA: '@dcuf_offline_data',
+  USER_TOKEN: '@rise_user_token',
+  USER_DATA: '@rise_user_data',
+  SETTINGS: '@rise_settings',
+  OFFLINE_DATA: '@rise_offline_data',
 };

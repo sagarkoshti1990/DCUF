@@ -1,0 +1,36 @@
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="96" fill="#FF6B35"/>
+  
+  <!-- Sun -->
+  <circle cx="96" cy="80" r="28" fill="#FFD93D"/>
+  
+  <!-- Sun rays -->
+  <g stroke="#FFD93D" stroke-width="3" stroke-linecap="round">
+    <!-- Top rays -->
+    <line x1="96" y1="35" x2="96" y2="45"/>
+    <line x1="113" y1="40" x2="110" y2="49"/>
+    <line x1="79" y1="40" x2="82" y2="49"/>
+    <line x1="125" y1="52" x2="119" y2="58"/>
+    <line x1="67" y1="52" x2="73" y2="58"/>
+    
+    <!-- Side rays -->
+    <line x1="140" y1="80" x2="130" y2="80"/>
+    <line x1="52" y1="80" x2="62" y2="80"/>
+    <line x1="125" y1="108" x2="119" y2="102"/>
+    <line x1="67" y1="108" x2="73" y2="102"/>
+  </g>
+  
+  <!-- Mountains -->
+  <path d="M20 130 L50 100 L80 115 L110 95 L140 105 L172 130 Z" fill="#4A5D23"/>
+  <path d="M40 130 L70 110 L100 120 L130 105 L160 115 L192 130 Z" fill="#5D7129"/>
+  
+  <!-- Ground -->
+  <path d="M0 130 L192 130 L192 192 L0 192 Z" fill="#8FBC8F"/>
+  
+  <!-- Clouds -->
+  <ellipse cx="140" cy="65" rx="12" ry="6" fill="#FFFFFF" opacity="0.8"/>
+  <ellipse cx="145" cy="60" rx="8" ry="4" fill="#FFFFFF" opacity="0.8"/>
+  <ellipse cx="40" cy="55" rx="10" ry="5" fill="#FFFFFF" opacity="0.8"/>
+  <ellipse cx="45" cy="52" rx="6" ry="3" fill="#FFFFFF" opacity="0.8"/>
+</svg>

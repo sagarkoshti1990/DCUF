@@ -1,6 +1,6 @@
 // App Configuration
 export const APP_CONFIG = {
-  NAME: 'DCUF - Data Collection',
+  NAME: 'RISE - Data Collection',
   VERSION: '1.0.0',
   MAX_SUBMISSIONS_PER_WORD: 5,
   API_TIMEOUT: 10000,
@@ -10,7 +10,7 @@ export const APP_CONFIG = {
 
 // API Endpoints
 export const API_ENDPOINTS = {
-  BASE_URL: 'https://api.dcuf.example.com',
+  BASE_URL: 'https://api.rise.example.com',
   AUTH: {
     LOGIN: '/auth/login',
     LOGOUT: '/auth/logout',
@@ -25,12 +25,12 @@ export const API_ENDPOINTS = {
 
 // Storage Keys
 export const STORAGE_KEYS = {
-  USER_DATA: '@dcuf_user_data',
-  AUTH_TOKEN: '@dcuf_auth_token',
-  REFRESH_TOKEN: '@dcuf_refresh_token',
-  SETTINGS: '@dcuf_settings',
-  OFFLINE_DATA: '@dcuf_offline_data',
-  SUBMISSIONS: '@dcuf_submissions',
+  USER_DATA: '@rise_user_data',
+  AUTH_TOKEN: '@rise_auth_token',
+  REFRESH_TOKEN: '@rise_refresh_token',
+  SETTINGS: '@rise_settings',
+  OFFLINE_DATA: '@rise_offline_data',
+  SUBMISSIONS: '@rise_submissions',
 } as const;
 
 // Audio Configuration

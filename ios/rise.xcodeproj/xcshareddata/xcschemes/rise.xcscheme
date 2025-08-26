@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "dcuf.app"
-               BlueprintName = "dcuf"
-               ReferencedContainer = "container:dcuf.xcodeproj">
+               BuildableName = "rise.app"
+               BlueprintName = "rise"
+               ReferencedContainer = "container:rise.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "dcufTests.xctest"
-               BlueprintName = "dcufTests"
-               ReferencedContainer = "container:dcuf.xcodeproj">
+               BuildableName = "riseTests.xctest"
+               BlueprintName = "riseTests"
+               ReferencedContainer = "container:rise.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "dcuf.app"
-            BlueprintName = "dcuf"
-            ReferencedContainer = "container:dcuf.xcodeproj">
+            BuildableName = "rise.app"
+            BlueprintName = "rise"
+            ReferencedContainer = "container:rise.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "dcuf.app"
-            BlueprintName = "dcuf"
-            ReferencedContainer = "container:dcuf.xcodeproj">
+            BuildableName = "rise.app"
+            BlueprintName = "rise"
+            ReferencedContainer = "container:rise.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

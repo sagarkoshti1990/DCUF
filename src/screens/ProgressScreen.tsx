@@ -47,7 +47,12 @@ const ProgressScreen: React.FC = () => {
   // Create stable user identifier to prevent unnecessary re-renders
   const userApiId = useMemo(() => {
     if (!state.user) return null;
-    return (state.user as any).apiId || state.user.userId?.toString() || null;
+    return (
+      (state.user as any).id ||
+      (state.user as any).apiId ||
+      state.user.userId?.toString() ||
+      null
+    );
   }, [state.user]); // Include state.user for linter compliance
 
   const loadProgressData = useCallback(async () => {
@@ -102,7 +107,7 @@ const ProgressScreen: React.FC = () => {
             sortOrder: 'DESC',
           }),
         ]);
-
+      console.log('allResponse.data sagar 1', allResponse);
       setStats({
         totalSubmissions: allResponse.data?.pagination?.total || 0,
         approvedSubmissions: approvedResponse.data?.pagination?.total || 0,
@@ -117,6 +122,8 @@ const ProgressScreen: React.FC = () => {
       loadingProgressRef.current = false;
     }
   }, [userApiId]);
+
+  console.log('allResponse.data sagar 2', stats, userApiId);
 
   useEffect(() => {
     loadProgressData();
